@@ -44,6 +44,12 @@ texliveのインストール: 各々調べてほしい．
 ### step0
 必要な依存関係をインストール
 
+依存関係が足りているか，次のコマンドで確認できる．エラーが出なければOK．
+ただしtexliveは除く．
+```bash
+cargo make check
+```
+
 ### step1
 ![arXiv右上，AccessPaper の下にView PDFがある． その1つ下に，TeXソースをダウンロードできるボタンがある．](image.png)
 
