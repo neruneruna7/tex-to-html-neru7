@@ -59,14 +59,18 @@ cargo make check
 
 ### step3
 `cargo make build`を実行する．
+`dist/<filename>/index.html`が生成される．
 
 ### step4
-`dist/<filename>/index.html`が生成される．ブラウザで開いてみる．
+git pushする.
 
 ## 対応しているTeX文書構造
 エントリポイントが次のもの．
 - main.tex
 - `<hoge>.tar.gz`のとき，`<hoge>.tex`があるときはそれをエントリポイントとする．
+
+## 未確認事項
+リポジトリをforkしたあと，Pagesデプロイ機能がそのままでちゃんと動くかは確認していない．
 
 ## 困ったら
 私に適当に聞いてくれれば，texliveのエラー以外は対応する．
