@@ -1,0 +1,115 @@
+[tasks.default]
+dependencies = ["html"]
+
+[tasks.html]
+script_runner = "bash"
+script = '''
+set -euo pipefail
+
+archive="${1:-}"
+tex_main="${2:-}"
+
+if [ -z "$archive" ]; then
+  echo "Usage:" >&2
+  echo "  makers html <archive.tar.gz> [main.tex]" >&2
+  exit 1
+fi
+
+if [ ! -f "$archive" ]; then
+  echo "Archive not found: $archive" >&2
+  exit 1
+fi
+
+archive_dir="$(dirname "$archive")"
+filename="$(basename "$archive")"
+base="${filename%.tar.gz}"
+
+if [ "$base" = "$filename" ]; then
+  echo "Archive must end with .tar.gz: $archive" >&2
+  exit 1
+fi
+
+extract_dir="$archive_dir/$base"
+
+rm -rf "$extract_dir"
+mkdir -p "$extract_dir"
+
+tar -xzf "$archive" -C "$extract_dir"
+
+echo "Extracted: $archive -> $extract_dir/"
+
+config_file="$extract_dir/make4ht-single.cfg"
+
+cat > "$config_file" <<'EOF'
+\Preamble{xhtml}
+\Configure{CutAt}{}
+\Css{
+:root {
+  color-scheme: light;
+}
+html, body {
+  background: #ffffff;
+  color: #000000;
+}
+}
+\begin{document}
+\EndPreamble
+EOF
+
+if [ -n "$tex_main" ]; then
+  tex_file="$tex_main"
+else
+  tex_count="$(find "$extract_dir" -type f -name '*.tex' | wc -l | tr -d ' ')"
+
+  if [ "$tex_count" -eq 0 ]; then
+    echo "No .tex file found under: $extract_dir/" >&2
+    exit 1
+  fi
+
+  if [ "$tex_count" -gt 1 ]; then
+    echo "Multiple .tex files found under: $extract_dir/" >&2
+    find "$extract_dir" -type f -name '*.tex' >&2
+    echo "" >&2
+    echo "Specify the main TeX file relative to $extract_dir:" >&2
+    echo "  makers html $archive main.tex" >&2
+    exit 1
+  fi
+
+  abs_tex_file="$(find "$extract_dir" -type f -name '*.tex' | head -n 1)"
+  tex_file="${abs_tex_file#"$extract_dir"/}"
+fi
+
+if [ ! -f "$extract_dir/$tex_file" ]; then
+  echo "TeX file not found: $extract_dir/$tex_file" >&2
+  exit 1
+fi
+
+echo "TeX source: $extract_dir/$tex_file"
+
+(
+  cd "$extract_dir"
+
+  rm -rf dist
+  mkdir -p dist
+
+  make4ht \
+    -d dist \
+    -c make4ht-single.cfg \
+    "$tex_file" \
+    "html5,mathjax"
+
+  html_count="$(find dist -maxdepth 1 -type f -name '*.html' | wc -l | tr -d ' ')"
+
+  if [ "$html_count" -ne 1 ]; then
+    echo "Expected exactly one HTML file, but found $html_count:" >&2
+    find dist -maxdepth 1 -type f -name '*.html' >&2
+    exit 1
+  fi
+
+  html_file="$(find dist -maxdepth 1 -type f -name '*.html' | head -n 1)"
+
+  mv "$html_file" dist/index.html
+
+  echo "Generated: $extract_dir/dist/index.html"
+)
+'''
