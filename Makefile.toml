@@ -17,7 +17,7 @@ args = ["scripts/convert_all.rs"]
 [tasks.index]
 description = "Generate dist/index.html"
 command = "rust-script"
-args = ["generate_index.rs", "dist", "DistTitles.toml"]
+args = ["scripts/generate_index.rs", "dist", "DistTitles.toml"]
 
 [tasks.clean]
 description = "Remove generated work/ and dist/"
