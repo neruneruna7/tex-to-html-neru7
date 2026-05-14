@@ -67,7 +67,7 @@ fn main() -> Result<()> {
 
             path
         }
-        None => find_single_tex_file(&work_dir)?,
+        None => find_main_tex_file(&work_dir)?,
     };
 
     println!("TeX source: {}", work_dir.join(&tex_file_rel).display());
@@ -158,8 +158,13 @@ fn extract_tar_gz(archive_path: &Path, extract_dir: &Path) -> Result<()> {
 
     Ok(())
 }
+fn find_main_tex_file(work_dir: &Path) -> Result<PathBuf> {
+    let conventional_main = work_dir.join("main.tex");
 
-fn find_single_tex_file(work_dir: &Path) -> Result<PathBuf> {
+    if conventional_main.is_file() {
+        return Ok(PathBuf::from("main.tex"));
+    }
+
     let mut tex_files = Vec::new();
 
     for entry in WalkDir::new(work_dir)
@@ -188,7 +193,7 @@ fn find_single_tex_file(work_dir: &Path) -> Result<PathBuf> {
         0 => bail!("no .tex file found under {}", work_dir.display()),
         1 => Ok(tex_files.remove(0)),
         _ => {
-            eprintln!("Multiple .tex files found:");
+            eprintln!("Multiple .tex files found and no top-level main.tex was selected:");
             for path in &tex_files {
                 eprintln!("  {}", path.display());
             }

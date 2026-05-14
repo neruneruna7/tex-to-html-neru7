@@ -1,0 +1,861 @@
+<!DOCTYPE html> 
+<html lang='en-US' xml:lang='en-US'> 
+<head> <title></title> 
+<meta charset='utf-8' /> 
+<meta content='TeX4ht (https://tug.org/tex4ht/)' name='generator' /> 
+<meta content='width=device-width,initial-scale=1' name='viewport' /> 
+<link href='mGAN-AI-name.css' rel='stylesheet' type='text/css' /> 
+<meta content='mGAN-AI-name.tex' name='src' /> 
+<script>window.MathJax = { tex: { tags: "ams", }, }; </script> 
+<script async='async' id='MathJax-script' src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js' type='text/javascript'></script>  
+</head><body>
+<!-- l. 47 --><p class='noindent'>
+                                                                                                  
+                                                                                                  
+</p><!-- l. 47 --><p class='indent'>
+                                                                                                  
+                                                                                                  
+</p><!-- l. 47 --><p class='noindent'><span class='ptmr7t-x-x-240'>Beyond Inferring Class Representatives: User-Level
+Privacy Leakage From Federated Learning</span>
+</p><!-- l. 47 --><p class='noindent'>
+</p><!-- l. 47 --><p class='noindent'>                        <span class='ptmr7t-x-x-110'>Zhibo Wang</span><span class='mathjax-inline'>\(^{\dagger }\)</span><span class='ptmr7t-x-x-110'>, Mengkai Song</span><span class='mathjax-inline'>\(^{\dagger }\)</span><span class='ptmr7t-x-x-110'>, Zhifei Zhang</span><span class='mathjax-inline'>\(^{\ddagger }\)</span><span class='ptmr7t-x-x-110'>, Yang Song</span><span class='mathjax-inline'>\(^{\ddagger }\)</span><span class='ptmr7t-x-x-110'>, Qian Wang</span><span class='mathjax-inline'>\(^{\dagger }\)</span><span class='ptmr7t-x-x-110'>, Hairong Qi</span><span class='mathjax-inline'>\(^{\ddagger }\)
+                              \(^{\dagger }\)</span>School of Cyber Science and Engineering, Wuhan University, P. R. China
+                   <span class='mathjax-inline'>\(^{\ddagger }\)</span>Deptment of Electrical Engineering and Computer Science, University of Tennessee, Knoxville, USA
+                        Email: <span class='cmsy-10'>{</span>zbwang, mksong, qianwang<span class='cmsy-10'>}</span>@whu.edu.cn, <span class='cmsy-10'>{</span>zzhang61, ysong18, hqi<span class='cmsy-10'>}</span>@utk.edu
+</p><!-- l. 50 --><p class='noindent'><span class='ptmb7t-x-x-90'>Abstract
+       </span><span class='ptmr7t-x-x-90'>Federated  learning,  i.e.,  a  mobile  edge  computing  framework  for  deep  learning,  is  a  recent  advance  in  privacy-preserving
+    machine  learning,  where  the  model  is  trained  in  a  decentralized  manner  by  the  clients,  i.e.,  data  curators,  preventing  the
+    server  from  directly  accessing  those  private  data  from  the  clients.  This  learning  mechanism  significantly  challenges  the
+    attack  from  the  server  side.  Although  the  state-of-the-art  attacking  techniques  that  incorporated  the  advance  of  Generative
+    adversarial  networks  (GANs)  could  construct  class  representatives  of  the  global  data  distribution  among  all  clients,  it  is  still
+    challenging  to  distinguishably  attack  a  specific  client  (i.e.,  user-level  privacy  leakage),  which  is  a  stronger  privacy  threat
+    to  precisely  recover  the  private  data  from  a  specific  client.  This  paper  gives  the  first  attempt  to  explore  user-level  privacy
+    leakage  against  the  federated  learning  by  the  attack  from  a  malicious  server.  We  propose  a  framework  incorporating  GAN
+    with  a  multi-task  discriminator,  which  simultaneously  discriminates  category,  reality,  and  client  identity  of  input  samples.
+    The  novel  discrimination  on  client  identity  enables  the  generator  to  recover  user  specified  private  data.  Unlike  existing  works
+    that  tend  to  interfere  the  training  process  of  the  federated  learning,  the  proposed  method  works  “invisibly”  on  the  server
+    side.  The  experimental  results  demonstrate  the  effectiveness  of  the  proposed  attacking  approach  and  the  superior  to  the
+    state-of-the-art.</span><span class='footnote-mark'><a href='#fn1x0' id='fn1x0-bk'><sup class='textsuperscript'>1</sup></a></span><a id='x1-2f1'></a>
+</p><!-- l. 54 --><p class='indent' id='iintroduction'>  
+<a id='x1-4r1'></a>
+<span class='ptmrc7t-'>I.  I<span class='small-caps'>ntroduction</span></span>
+<a id='Q1-1-0'></a>
+</p><!-- l. 56 --><p class='indent'>  Increasingly, modern deep learning technique is beginning to emerge in the networking domain, such as a crowdsourced system for
+learning tasks. But utilizing conventional centralized training methodology requires local storage of the crowdsourced data, which
+suffers from the high volume of traffic, highly computational demands and privacy concerns. For collectively reaping the benefits of the
+shared model trained from this rich data without the need to store it centrally, distributed learning framework was proposed, serving as
+a mobile edge computing framework for deep learning. Shokri et al. <span class='cite'> [<a href='#Xshokri2015privacy'>1</a>]</span> proposed the collaborative learning DSSGD, where the data
+providers, i.e., clients, train locally on a shared model, and then the server will collect those local models/updates to estimate/update a
+global model instead of directly assessing the private data from clients. Then, the global model is sent back to clients, iterating the
+aforementioned local training process. In the same token, federated learning <span class='cite'> [<a href='#Xmcmahan2016communication'>2</a>]</span> proposed a variant of decentralized learning
+with higher efficiency. The key improvement lies in the way of updating the global model, i.e., DSSGD performs the
+aggregated update while the federated learning conducts the averaged update, which is more suitable for the commonly
+non-IID and unbalanced data distribution among clients in the real world. Fig. <a href='#the-framework-of-federated-learning-the-server-sends-the-shared-model-to-each-client-which-trains-the-shared-model-locally-by-its-private-data-then-the-update-from-each-client-is-uploaded-to-the-server-where-those-updates-are-aggregatedaveraged-to-improve-the-shared-model-in-a-collaborative-manor'>1<!-- tex4ht:ref: fig:fedLearning  --></a> illustrates the framework of federated
+learning.
+</p>
+  <hr class='figure' /><div class='figure'>
+                                                                                                  
+                                                                                                  
+                                                                                                  
+                                                                                                  
+<!-- l. 67 --><p class='noindent' id='the-framework-of-federated-learning-the-server-sends-the-shared-model-to-each-client-which-trains-the-shared-model-locally-by-its-private-data-then-the-update-from-each-client-is-uploaded-to-the-server-where-those-updates-are-aggregatedaveraged-to-improve-the-shared-model-in-a-collaborative-manor'> <img alt='PIC' height='490' src='pic/federated_learning-.png' width='490' /> <a id='x1-5r1'></a>
+Fig. 1:  The  framework  of  federated  learning.  The  server  sends  the  shared  model  to  each  client,  which  trains  the  shared
+model  locally  by  its  private  data.  Then,  the  update  from  each  client  is  uploaded  to  the  server,  where  those  updates  are
+aggregated/averaged to improve the shared model in a collaborative manor.
+                                                                                                  
+                                                                                                  
+</p>
+  </div><hr class='endfigure' />
+<!-- l. 74 --><p class='indent'>  However, recent works demonstrated that the collaborative learning is vulnerable to the inference attack, e.g., reconstruction attack
+and membership attack, by malicious servers/clients because the shared model is updated according to those private data, whose pattern
+is encoded into the model parameters. Therefore, if a corresponding decoder could be constructed, the private data or statistics will be
+recovered inversely. Under the assumption of a malicious server, Aono et al. <span class='cite'> [<a href='#Xaono2017privacy'>3</a>]</span> partially recovered the private data based on the
+observation that the gradient of weights is proportional to that of the bias at the first layer of the model, and their radio approximates to
+the training input. But it could only apply to a simplified setting where the training batch has only one sample. Hitaj et al. <span class='cite'>
+ [<a href='#Xhitaj2017deep'>4</a>]</span> proposed a GAN-based reconstruction attack against the collaborative learning by assuming a malicious client,
+which utilized the shared model as the discriminator to train a GAN <span class='cite'> [<a href='#Xgoodfellow2014generative'>5</a>]</span>. Eventually, the learned generator (equivalent
+to the decoder) will successfully mimic the training samples. Although <span class='cite'> [<a href='#Xhitaj2017deep'>4</a>]</span> had demonstrated the effectiveness of
+GAN-based attack against DSSGD, it presents mainly three limitations: 1) It would change the architecture of the
+shared model and introduce adversarial influence to the learning process, while the former unrealistically assumes a
+powerful malicious client, and the latter compromises the learning process. 2) The GAN-based attack suffers from
+performance degradation when attacks the federated learning because the adversarial influence introduced by the malicious
+client would become trivial after the average update. 3) In addition, the GAN-based attack could only infer class-wised
+representatives, which are generic samples characterizing class properties rather than the exact samples from the clients <span class='cite'>
+ [<a href='#Xmelis2018inference'>6</a>]</span>.
+</p><!-- l. 82 --><p class='indent'>  Motivated by those drawbacks in existing reconstruction attacking techniques, we propose a more generic, practical, and invisible
+attacking framework against the federated learning without affecting the learning process. In addition, we further target client-level
+privacy<span class='footnote-mark'><a href='#fn2x0' id='fn2x0-bk'><sup class='textsuperscript'>2</sup></a></span><a id='x1-6f2'></a>,
+which is more challenging and empirically meaningful than globally recovering the data representatives that characterize the population
+distribution as in the GAN-based attack. Instead of assuming a malicious client, the proposed method performs on the server side,
+which first explores the attack by a malicious server. Specifically, we adapt the original GAN to a multi-task scenario where reality,
+category, and identity of the target client are considered simultaneously. On the one hand, performing additional tasks when training the
+GAN improves the quality of synthesized samples <span class='cite'> [<a href='#Xodena2016conditional'>7</a>]</span> without the necessity of modification on the shared model or compromising to
+the federated learning, achieving invisible attack. On the other hand, the novel task of discriminating client identity enables client-level
+privacy recovery. For simplicity, the proposed framework is referred to as multi-task GAN for Auxiliary Identification
+(mGAN-AI).
+</p><!-- l. 90 --><p class='indent'>  The key novelty of mGAN-AI is to compromise the client-level privacy that is defined as the client-dependent properties, which
+specifically characterize the corresponding client and distinguish the client from the others. The key of achieving the discrimination on
+client identity is to obtain data representatives from each individual client, such that the training of GAN can be supervised by the
+identity representatives, generating samples with specific identity (i.e., from a specific client). Since the client data is unaccessible, we
+adopt an optimization-based method to estimate such data representatives from those accessible updates from the clients. The
+mGAN-AI relaxes the assumption that clients own mutually exclusive class labels, achieving a more generic attack to the federated
+learning.
+</p><!-- l. 95 --><p class='indent'>  In summary, our contributions are mainly in three-fold: </p>
+    <ul class='itemize1'>
+    <li class='itemize'>To the best of our knowledges, we first explore the attack from the perspective of a malicious server against the federated
+    learning.  In  addition,  beyond  inferring  class-wised  representatives,  we  step  further  to  recover  user-level  privacy  in  an
+    invisible manner.
+    </li>
+    <li class='itemize'>Correspondingly,  we  propose  the  generic  attacking  framework  mGAN-AI that  incorporates  a  multi-task  GAN,  which
+    conducts a novel discrimination on client identity, achieving attack to user-level privacy.
+    </li>
+    <li class='itemize'>Exhaustive   experimental   evaluation   is   conducted   to   demonstrate   the   effectiveness   and   superior   of   the   proposed
+    mGAN-AI as  compared  to  existing  works.  On  the  MNIST  and  AT&amp;T  datasets,  mGAN-AI successfully  recovers  the
+    samples from a specific user.
+</li></ul>
+<!-- l. 106 --><p class='indent'>  The rest of this paper is organized as follows. Section <a href='#x1-8r2'>II<!-- tex4ht:ref: sec:related  --></a> introduces the related works on privacy-preserving distributed learning and
+attack models. Section <a href='#x1-11r3'>III<!-- tex4ht:ref: sec:preliminary  --></a> briefs the background knowledge. The threat models are discussed in section <a href='#x1-16r4'>IV<!-- tex4ht:ref: sec:threat  --></a>, and then the proposed
+mGAN-AI attack is detailed in sections <a href='#x1-21r5'>V<!-- tex4ht:ref: sec:attack  --></a>. Extensive experimental evaluation is conducted in section <a href='#x1-39r6'>VI<!-- tex4ht:ref: sec:experiment  --></a>. Finally, section <a href='#x1-55r7'>VII<!-- tex4ht:ref: sec:conclusion  --></a>
+                                                                                                  
+                                                                                                  
+concludes the paper.
+</p><!-- l. 109 --><p class='indent' id='ivthreat-model'>  
+<a id='x1-8r2'></a>
+<span class='ptmrc7t-'>II.  R<span class='small-caps'>elated work</span></span>
+<a id='Q1-1-1'></a>
+</p><!-- l. 111 --><p class='indent'>  This section provides the background of privacy-preserving related learning methods, as well as corresponding attacking
+approaches.
+</p><!-- l. 113 --><p class='indent' id='ivthreat-model'>  
+<a id='x1-9r1'></a>
+  <span class='ptmri7t-'>A.  Privacy-preserving Distributed Learning</span>
+<a id='Q1-1-1'></a>
+</p><!-- l. 115 --><p class='indent'>  Distributed learning frameworks can be categorized according to the updating mechanism of the shared model. <span class='cite'> [<a href='#Xshokri2015privacy'>1</a>]</span>
+summarized the updates while <span class='cite'> [<a href='#Xmcmahan2016communication'>2</a>, <a href='#Xkonevcny2016federated'>8</a>]</span> averaged the updates, which outperform asynchronous approaches in aspects of
+communication efficiency and privacy preservation <span class='cite'> [<a href='#Xchen2016revisiting'>9</a>]</span>. Existing works on privacy-preserving distributed learning
+mostly utilize either differential privacy mechanism (DP) or secure multi-party computation (MPC). Pathak et al. <span class='cite'>
+ [<a href='#Xpathak2010multiparty'>10</a>]</span> proposed a DP-based global classifier by aggregating the locally trained classifiers. Hamm et al. <span class='cite'> [<a href='#Xhamm2016learning'>11</a>]</span> leveraged
+knowledge transfer from ensemble local models to a global differentially private model. DSSGD <span class='cite'> [<a href='#Xshokri2015privacy'>1</a>]</span> was the first
+collaborative learning mechanism dealing with practical distribution, which used sparse vector <span class='cite'> [<a href='#Xdwork2014algorithmic'>12</a>]</span> to realize DP. Recently,
+participant-level differentially private distributed learning method <span class='cite'> [<a href='#Xgeyer2017differentially'>13</a>]</span> was proposed to further protect the membership
+information of participants. Utilizing MPC, Mohassel et al. <span class='cite'> [<a href='#Xmohassel2017secureml'>14</a>]</span> presented the SecureML framework where a global
+model is trained on the clients’ encrypted data among two non-colluding servers. Other methods based on encryption
+include secure sum protocol <span class='cite'> [<a href='#Xdanner2015fully'>15</a>]</span> that uses a tree topology, homomorphic encryption, and secure aggregation protocol <span class='cite'>
+ [<a href='#Xbonawitz2017practical'>16</a>]</span>.
+</p><!-- l. 124 --><p class='indent' id='ivthreat-model'>  
+<a id='x1-10r2'></a>
+  <span class='ptmri7t-'>B.  Attacks on the Learning Model</span>
+<a id='Q1-1-1'></a>
+</p><!-- l. 127 --><p class='indent'>  The inference attack, e.g., membership attack and reconstruction attack, aims to infer the private features of the training
+data against a learning model. The membership attack <span class='cite'> [<a href='#Xshokri2017membership'>17</a>, <a href='#Xhayes2017logan'>18</a>, <a href='#Xmelis2018inference'>6</a>]</span> is to decide whether a given sample belongs to
+the training dataset. Shokri et al. <span class='cite'> [<a href='#Xshokri2017membership'>17</a>]</span> mounted the attack by utilizing the difference between model outputs from
+training and non-training inputs, respectively. Hayes et al. <span class='cite'> [<a href='#Xhayes2017logan'>18</a>]</span> used GAN to detect overfitting of the target model and
+recognize inputs through the discriminator which could distinguish different data distributions. Melis et al. <span class='cite'> [<a href='#Xmelis2018inference'>6</a>]</span> first
+proposed the membership attack against the collaborative/federated learning and further inferred the properties by a
+batch property classifier. By contrast, the reconstruction attack aims to construct the training samples by accessing
+a learning model <span class='cite'> [<a href='#Xfredrikson2015model'>19</a>, <a href='#Xhitaj2017deep'>4</a>, <a href='#Xaono2017privacy'>3</a>]</span>. Fredrikson et al. <span class='cite'> [<a href='#Xfredrikson2015model'>19</a>]</span> proposed the model inversion (MI) attack to recover images
+from a face recognition service by maximizing the confidence values with respect to a white noise image. Against
+collaborative/federated learning framework, Aono et al. <span class='cite'> [<a href='#Xaono2017privacy'>3</a>]</span> partially recovered private data of the clients based on the proportionality
+between the training data and the updates sent to the server (assuming a malicious server). Hitaj et al. <span class='cite'> [<a href='#Xhitaj2017deep'>4</a>]</span> assumed
+a malicious client in the federated learning, where the malicious client has white-box access to the model at every
+training iteration. Utilizing GAN to synthesize samples, this attack successfully reconstructed the private data of other
+clients.
+</p><!-- l. 136 --><p class='indent'>  This paper proposes a GAN-based reconstruction attack against the federated learning from the perspective of a malicious server,
+unlike related works that failed to threaten the federated learning in a practical and invisible manner. For example, <span class='cite'> [<a href='#Xaono2017privacy'>3</a>]</span> could only be
+applied to a simplified setting where the training batch has only one sample, and <span class='cite'> [<a href='#Xhitaj2017deep'>4</a>]</span> performed the attack by modifying the
+architecture of the shared model which is beyond the power of a malicious client, and it introduced negative influence into the standard
+training process, tending to worsen the shared model.
+</p><!-- l. 140 --><p class='indent' id='ivthreat-model'>  
+<a id='x1-11r3'></a>
+<span class='ptmrc7t-'>III.  P<span class='small-caps'>reliminary</span></span>
+<a id='Q1-1-1'></a>
+</p><!-- l. 142 --><p class='indent' id='ivthreat-model'>  
+                                                                                                  
+                                                                                                  
+<a id='x1-12r1'></a>
+  <span class='ptmri7t-'>A.  Federated Learning</span>
+<a id='Q1-1-1'></a>
+</p><!-- l. 144 --><p class='indent'>  Compared to the conventional training methods that require to directly access private data from clients, federated learning presents
+significant advantages in privacy preservation because of the distributed learning, where the clients share and train the model locally
+without uploading their private data to the server. Fig. <a href='#illustration-of-the-proposed-mganaifrom-a-malicious-server-in-the-federated-learning-there-are-n-clients-and-the-vth-client-is-attacked-as-the-victim-the-shared-model-at-the-tth-iteration-is-denoted-as-mt-and-utk-denotes-corresponding-update-from-the-kth-client-on-the-malicious-server-a-discriminator-d-orange-and-generator-g-blue-are-trained-based-on-the-update-utv-from-the-victim-the-shared-model-mt-and-representatives-xk-xv-from-each-client-xaux-denotes-an-auxiliary-real-dataset-to-train-d-on-the-realfake-task'>2<!-- tex4ht:ref: fig:framework  --></a> illustrates the proposed mGAN-AI, as well as the federated learning. There
+are <span class='mathjax-inline'>\(N\)</span> clients, each of which owns its private dataset. During the learning, clients agree on a common objective and
+model structure. At each iteration, the parameters of current model are downloaded from the server to clients, and
+then the model is trained locally on each client. Finally, those local updates are sent back to the server, where the
+updates are averaged and accumulated to the current shared model. Eq. <a href='#x1-13r1'>1<!-- tex4ht:ref: eq:federated  --></a> expresses the update of the shared model.
+</p><div class='mathjax-env mathjax-equation'>\begin{equation} M_{t+1} = M_t + \frac {1}{N} \sum _{k=1}^{N}u^k_t, \label {eq:federated} \end{equation}</div>
+<p><a id='x1-13r1'></a>
+<!-- l. 150 --></p><p class='indent'>  where <span class='mathjax-inline'>\(M_t\)</span> denotes the shared model at the <span class='mathjax-inline'>\(t\)</span>th iteration, and <span class='mathjax-inline'>\(u^k_t\)</span> indicates the update from the <span class='mathjax-inline'>\(k\)</span>th client at iteration <span class='mathjax-inline'>\(t\)</span>. <span class='cite'> [<a href='#Xmcmahan2016communication'>2</a>]</span> demonstrated that a
+valid model could be achieved by averaging the updates only if the clients receive the model with the same initialization. The federated
+learning satisfies this condition.
+</p><!-- l. 153 --><p class='indent' id='ivthreat-model'>  
+<a id='x1-14r2'></a>
+  <span class='ptmri7t-'>B.  Generative Adversarial Networks</span>
+<a id='Q1-1-1'></a>
+</p><!-- l. 155 --><p class='indent'>  Generative adversarial nets (GANs) were first proposed by Goodfellow <span class='cite'> [<a href='#Xgoodfellow2014generative'>5</a>]</span>, which could generate samples indistinguishable from
+those training/real samples. It consists of a generator <span class='mathjax-inline'>\(G\)</span> and a discriminator <span class='mathjax-inline'>\(D\)</span>. The generator <span class='mathjax-inline'>\(G\)</span> draws random samples <span class='mathjax-inline'>\(z\)</span> from a prior
+distribution (e.g., Gaussian or uniform distribution) as the inputs, and then <span class='mathjax-inline'>\(G\)</span> generates samples from <span class='mathjax-inline'>\(z\)</span>. Given a training set, the
+discriminator <span class='mathjax-inline'>\(D\)</span> is trained to distinguish the generated samples from the training (real) samples. Eq. <a href='#x1-15r2'>2<!-- tex4ht:ref: eq:gan  --></a> shows the objective of GANs.
+</p><div class='mathjax-env mathjax-equation'>\begin{equation} \begin {split} \min _G\max _D\;V(D,G) = &amp; \mathbb {E}_{x\sim p_{data}(x)}[\log D(x)]+\\ ~ &amp; \mathbb {E}_{z\sim p_{z}(z)}[\log (1-D(G(z)))], \end {split} \label {eq:gan} \end{equation}</div>
+<p><a id='x1-15r2'></a>
+<!-- l. 164 --></p><p class='indent'>  where <span class='mathjax-inline'>\(p_{data}\)</span> and <span class='mathjax-inline'>\(p_{z}\)</span> denote the training/real distribution and prior distribution, respectively. The two models <span class='mathjax-inline'>\(G\)</span> and <span class='mathjax-inline'>\(D\)</span> are trained alternately until
+this minimax game achieves Nash equilibrium, where the generated samples are difficult to be discriminated from
+the read ones. Theoretically, the global optimum is achieved at <span class='mathjax-inline'>\(p_{data} = p_{g}\)</span> <span class='cite'> [<a href='#Xgoodfellow2014generative'>5</a>]</span>, where <span class='mathjax-inline'>\(p_g\)</span> indicates the distribution of generated
+samples.
+</p><!-- l. 167 --><p class='indent' id='ivthreat-model'>  
+<a id='x1-16r4'></a>
+<span class='ptmrc7t-'>IV.  T<span class='small-caps'>hreat</span> M<span class='small-caps'>odel</span></span>
+<a id='Q1-1-1'></a>
+                                                                                                  
+                                                                                                  
+</p><!-- l. 170 --><p class='indent'>  </p><hr class='float' /><div class='float' id='illustration-of-the-proposed-mganaifrom-a-malicious-server-in-the-federated-learning-there-are-n-clients-and-the-vth-client-is-attacked-as-the-victim-the-shared-model-at-the-tth-iteration-is-denoted-as-mt-and-utk-denotes-corresponding-update-from-the-kth-client-on-the-malicious-server-a-discriminator-d-orange-and-generator-g-blue-are-trained-based-on-the-update-utv-from-the-victim-the-shared-model-mt-and-representatives-xk-xv-from-each-client-xaux-denotes-an-auxiliary-real-dataset-to-train-d-on-the-realfake-task'>
+                                                                                                  
+                                                                                                  
+ <img alt='PIC' height='929' src='pic/framework-.png' width='928' /> <a id='x1-17r2'></a>
+Fig. 2: Illustration of the proposed mGAN-AI from a malicious server in the federated learning. There are <span class='mathjax-inline'>\(N\)</span> clients, and the <span class='mathjax-inline'>\(v\)</span>th
+client is attacked as the victim. The shared model at the <span class='mathjax-inline'>\(t\)</span>th iteration is denoted as <span class='mathjax-inline'>\(M_t\)</span>, and <span class='mathjax-inline'>\(u_t^k\)</span> denotes corresponding update from
+the <span class='mathjax-inline'>\(k\)</span>th client. On the malicious server, a discriminator <span class='mathjax-inline'>\(D\)</span> (orange) and generator <span class='mathjax-inline'>\(G\)</span> (blue) are trained based on the update <span class='mathjax-inline'>\(u_t^v\)</span> from the
+victim, the shared model <span class='mathjax-inline'>\(M_t\)</span>, and representatives <span class='mathjax-inline'>\(X_k\)</span>, <span class='mathjax-inline'>\(X_v\)</span> from each client. <span class='mathjax-inline'>\(X_{aux}\)</span> denotes an auxiliary real dataset to train <span class='mathjax-inline'>\(D\)</span> on the real-fake
+task.
+                                                                                                  
+                                                                                                  
+  </div><hr class='endfloat' />
+<!-- l. 179 --><p class='indent'>  This section introduces the threat model of the proposed mGAN-AI framework, and then the generality and rationality of assuming a
+malicious server in mGAN-AI is demonstrated as compared to related works.
+</p><!-- l. 181 --><p class='indent' id='vaoverview-of-mganai'>  
+<a id='x1-18r1'></a>
+  <span class='ptmri7t-'>A.  Learning Scenario</span>
+<a id='Q1-1-2'></a>
+</p><!-- l. 182 --><p class='indent'>  Following the training procedure of federated learning as described in Sec. <a href='#x1-12r1'>III-A<!-- tex4ht:ref: sec:fedAvg  --></a>, we assume <span class='mathjax-inline'>\(N\)</span> (<span class='mathjax-inline'>\(N \ge 2\)</span>) clients that agree on a common
+learning objective and train collaboratively on a shared model. Without loss of generality, the data of all clients is considered as
+non-IID distributed, which is also consistent with the settings of federated learning <span class='cite'> [<a href='#Xmcmahan2016communication'>2</a>]</span>. Specifically, the data distribution of an
+arbitrary client <span class='mathjax-inline'>\(k\)</span> (<span class='mathjax-inline'>\(k=1,2,\cdots ,N\)</span>) is independent from that of the other clients, and thus bias from the global distribution of all clients. The biased
+distribution <span class='mathjax-inline'>\(p_k\)</span> of the client <span class='mathjax-inline'>\(k\)</span> is considered as its client-level privacy. For simplicity, the shared model adopts an image classifier in the rest
+of this paper.
+</p><!-- l. 186 --><p class='indent' id='vaoverview-of-mganai'>  
+<a id='x1-19r2'></a>
+  <span class='ptmri7t-'>B.  Malicious Server</span>
+<a id='Q1-1-2'></a>
+</p><!-- l. 187 --><p class='indent'>  The server in the federated learning is assumed to be malicious, aiming to reconstruct private data of the victim, which refers to the
+target client, for implementing the client-level privacy attack. The malicious server could either only analyze the periodic updates from
+the clients (i.e., <span class='ptmri7t-'>passive attack</span>), or even intentionally isolate the shared model trained by the victim to achieve more powerful attack
+(i.e., <span class='ptmri7t-'>active attack</span>). By contrast, most existing attacks against the collaborative/federated learning assumed malicious clients, which are
+limited at the stage of recovering class-wised representatives rather than prying client-level privacy because the malicious clients can
+only access aggregated updates (contributed by all the clients) from the server, while client-level attack requires individual
+update from each client. Although there are attacks targeting at certain clients <span class='cite'> [<a href='#Xhitaj2017deep'>4</a>, <a href='#Xmelis2018inference'>6</a>]</span>, they impractical assumed that
+class labels of the clients are mutually different or required extra information of the target client, e.g., class labels or
+other  client-wise  properties.  More  importantly,  they  would  compromise  the  performance  of  the  shared  model.  For
+example, <span class='cite'> [<a href='#Xmelis2018inference'>6</a>]</span> changed the training objective, and <span class='cite'> [<a href='#Xhitaj2017deep'>4</a>]</span> changed the shared model and introduced mislabeled samples into
+the training. Considering the limitation and drawback of malicious clients, we assume a malicious server that would
+overcome all above problems. The malicious server rigidly follows the rules of federated learning. Meanwhile, the
+passive and active attacks are performed without effecting on the learning process, i.e., shared model, objective, updates,
+etc.
+</p><!-- l. 198 --><p class='indent' id='vaoverview-of-mganai'>  
+<a id='x1-20r3'></a>
+  <span class='ptmri7t-'>C.  Communication Protocol</span>
+<a id='Q1-1-2'></a>
+</p><!-- l. 199 --><p class='indent'>  In our threat model, the shared model is exchanged between the server and clients in plain text like <span class='cite'> [<a href='#Xmcmahan2016communication'>2</a>]</span>, rather than in a
+encryption-based protocol <span class='cite'> [<a href='#Xcorrigan2013proactively'>20</a>, <a href='#Xbonawitz2017practical'>16</a>]</span>. Intuitively, the encryption-based aggregation prevents the adversary from accessing the updates of
+the clients, thus preserving their privacy. However, recent works <span class='cite'> [<a href='#Xhitaj2017deep'>4</a>, <a href='#Xmelis2018inference'>6</a>]</span>, which only accessed the aggregated updates, could
+compromise the clients’ privacy by introducing adversarial influence. In addition, the encryption-based aggregation also prevents the
+server from evaluating the utility of clients’ updates, degrading the learning model when malicious clients exist. <span class='cite'> [<a href='#Xbonawitz2017practical'>16</a>]</span> discussed the
+weakness of encryption-based protocol that it cannot guarantee the correctness of federated learning if there are malicious
+clients.
+</p><!-- l. 206 --><p class='indent' id='vaoverview-of-mganai'>  
+<a id='x1-21r5'></a>
+<span class='ptmrc7t-'>V.  A<span class='small-caps'>pproach</span></span>
+<a id='Q1-1-2'></a>
+</p><!-- l. 209 --><p class='indent'>  This section details the proposed mGAN-AI attack against the federated learning for reconstructing private data of a specific victim.
+The main idea is to design a multi-task GAN that could discriminatingly learn the real data distribution of the victim. Section <a href='#x1-22r1'>V-A<!-- tex4ht:ref: subsec:overview  --></a>
+gives a high-level overview of mGAN-AI, and Section <a href='#x1-26r2'>V-B<!-- tex4ht:ref: subsec:structure  --></a> details the structure of the GAN with a novel multi-task
+discriminator, which first achieves discrimination on client identity. Then, sections <a href='#x1-29r3'>V-C<!-- tex4ht:ref: subsec:passive  --></a> and <a href='#x1-34r4'>V-D<!-- tex4ht:ref: subsec:active  --></a> discuss the passive
+attack and active attack, respectively. The former performs in an invisible fashion, while the latter slightly interferes
+the share model but achieving more powerful attack. Finally, section <a href='#x1-35r5'>V-E<!-- tex4ht:ref: subsec:client  --></a> further details the inference of client-level
+privacy.
+</p><!-- l. 213 --><p class='indent' id='vaoverview-of-mganai'>  
+                                                                                                  
+                                                                                                  
+<a id='x1-22r1'></a>
+  <span class='ptmri7t-'>A.  Overview of mGAN-AI</span>
+<a id='Q1-1-2'></a>
+</p><!-- l. 216 --><p class='indent'>  The principle of GAN is to train a discriminator on target data and generated data simultaneously. Eventually, the coupled generator
+would yield samples close to target ones. In the proposed mGAN-AI, the idea of training a GAN is borrowed, but the malicious server
+cannot access the target data (i.e., client-level private data) in the scenario of federated learning. However, the shared model is trained
+locally on each client, equivalent to training a discriminator (with the same structure as the shared model) on the target data. Intuitively,
+directly obtaining the target data to train a discriminator is equivalent to obtaining the network update after feeding the target data to
+the discriminator. In the federated learning, the only accessible information to the malicious server is the updates from clients,
+which provide the update to the discriminator after training on the target data. For the generated data, it can be easily
+obtained from the corresponding generator. Therefore, the advance of GAN could be utilized in the federated learning. In
+addition, since GANs could generate conditioned samples if supervised by the condition in training <span class='cite'> [<a href='#Xchen2016infogan'>21</a>]</span>, we could train
+mGAN-AI conditoned on the updates from victim, thus it could generate victim-conditioned samples, i.e., client-level
+privacy.
+</p><!-- l. 220 --><p class='indent'>  Fig. <a href='#illustration-of-the-proposed-mganaifrom-a-malicious-server-in-the-federated-learning-there-are-n-clients-and-the-vth-client-is-attacked-as-the-victim-the-shared-model-at-the-tth-iteration-is-denoted-as-mt-and-utk-denotes-corresponding-update-from-the-kth-client-on-the-malicious-server-a-discriminator-d-orange-and-generator-g-blue-are-trained-based-on-the-update-utv-from-the-victim-the-shared-model-mt-and-representatives-xk-xv-from-each-client-xaux-denotes-an-auxiliary-real-dataset-to-train-d-on-the-realfake-task'>2<!-- tex4ht:ref: fig:framework  --></a> overviews the proposed mGAN-AI. Assume <span class='mathjax-inline'>\(N\)</span> clients, and the <span class='mathjax-inline'>\(v\)</span>th client is the victim whose data would be reconstructed by the
+malicious server. The malicious server acts as a normal server in the federated learning, while at the same time it is also an adversary.
+At the <span class='mathjax-inline'>\(t\)</span>th iteration, the malicious server sends the current shared model <span class='mathjax-inline'>\(M_t\)</span> to each of the <span class='mathjax-inline'>\(N\)</span> clients and then receives the updates <span class='mathjax-inline'>\(u^1_t, u^2_t,\cdots , u^{N}_t\)</span>
+from them after training on their private data. Specially, <span class='mathjax-inline'>\(u^v_t\)</span> denotes the update from the victim. For reconstructing the
+private data of the victim, we propose a new variant of GAN with a multi-task discriminator, which simultaneously
+discriminates category, reality, and client identity of input samples. Noted that the structure of the discriminator is the same as
+the shared model regardless of the output layer. Thus, the update <span class='mathjax-inline'>\(u_t^v\)</span> from the victim <span class='mathjax-inline'>\(v\)</span> could be either aggregated to the
+latest shared model and then to update the discriminator (passive attack) or aggregated to the discriminator directly
+(active attack). Besides, representatives of each client are calculated to supervise the training of <span class='mathjax-inline'>\(D\)</span> on identity. Then, the
+updated discriminator is trained on generated samples from the generator. Correspondingly, the generator is updated to
+approach the data from the victim. In the following, we will introduce the structure of the proposed multi-task GAN
+model.
+</p>
+  <hr class='figure' /><div class='figure' id='structure-comparison-between-the-ganbased-attack-a-hitaj2017deep-and-the-proposed-mganaib'>
+                                                                                                  
+                                                                                                  
+                                                                                                  
+                                                                                                  
+<div class='subfigure'>
+<div class='caption'><span class='id'>: </span><span class='content'></span></div><!-- l. 231 --><p class='noindent'> <img alt='PIC' height='247' src='./pic/GAN_uGAN-.png' width='247' /> <a id='x1-23r1'></a>
+<span class='ptmr7t-x-x-90'>(a) GAN-based attack</span>                                                                          </p></div>  <div class='subfigure'>
+<div class='caption'><span class='id'>: </span><span class='content'></span></div><!-- l. 236 --><p class='noindent'> <img alt='PIC' height='247' src='./pic/GAN_mGAN-AI-.png' width='247' /> <a id='x1-24r2'></a>
+<span class='ptmr7t-x-x-90'>(b) mGAN-AI</span>                                                                                       </p></div>  <a id='x1-25r3'></a>
+Fig. 3: Structure comparison between the GAN-based attack (a) <span class='cite'> [<a href='#Xhitaj2017deep'>4</a>]</span> and the proposed mGAN-AI (b).
+                                                                                                  
+                                                                                                  
+  </div><hr class='endfigure' />
+<!-- l. 245 --><p class='indent' id='viadatasets-and-experiment-setup'>  
+<a id='x1-26r2'></a>
+  <span class='ptmri7t-'>B.  Structure of the Multi-task GAN</span>
+<a id='Q1-1-3'></a>
+</p><!-- l. 247 --><p class='indent'>  Specifically, the discriminator of mGAN-AI is designed to achieve three tasks: 1) real-fake discrimination like standard GAN, 2)
+categorization on input samples, which performs like the shared model, further increasing the quality of generated samples <span class='cite'> [<a href='#Xodena2016conditional'>7</a>]</span>, and 3)
+identification on the input sample to distinguish the victim from other clients. The novel discrimination on identity is the key to
+violate user-level privacy. Fig. <a href='#x1-24r2'>2b<!-- tex4ht:ref: fig:stru_mGAN-AI  --></a> shows the multi-task GAN in the proposed mGAN-AI, where the discriminator <span class='mathjax-inline'>\(D\)</span>
+shares the structure with the shared model except the output layer because the output format of the three tasks are
+different. Compared to the GAN-based attack <span class='cite'> [<a href='#Xhitaj2017deep'>4</a>]</span>, mGAN-AI incorporates discrimination on identity that is also fed
+to <span class='mathjax-inline'>\(G\)</span> as an important condition. The network structure of <span class='mathjax-inline'>\(D\)</span> for each task in mGAN-AI is illustrated in the following,
+</p><div class='mathjax-env mathjax-equation'>\begin{equation} \begin {split} D_{real} &amp;= \text {Sigmoid} \left ( \text {FC}_{real} (L_{share}) \right ) \\ D_{cat} &amp;= \text {Softmax} \left ( \text {FC}_{cat} ( L_{share}) \right ) \\ D_{id} &amp;= \text {Sigmoid} \left ( \text {FC}_{id} (L_{share}) \right ), \end {split} \label {eq:D_T} \end{equation}</div>
+<p><a id='x1-27r3'></a>
+<!-- l. 258 --></p><p class='indent'>  where <span class='mathjax-inline'>\(D_{real}\)</span>, <span class='mathjax-inline'>\(D_{id}\)</span>, and <span class='mathjax-inline'>\(D_{cat}\)</span> denote the discriminator tasks of real-fake, identification, and categorization, respectively. Correspondingly, <span class='mathjax-inline'>\(\text {FC}_{id}\)</span>
+and <span class='mathjax-inline'>\(\text {FC}_{cat}\)</span> are the fully connection layer (i.e., output layer). <span class='mathjax-inline'>\(L_{share}\)</span> indicates the layers from the shared model except the output
+layer.
+</p><!-- l. 261 --><p class='indent'>  The generator <span class='mathjax-inline'>\(G\)</span> accepts category and identity labels, as well as the noise (z), to conditionally yield user specified samples. The
+objectives are expressed in Eq. <a href='#x1-28r4'>4<!-- tex4ht:ref: eq:objectives  --></a>. </p><div class='mathjax-env mathjax-equation'>\begin{equation} \begin {split} \mathcal {L}_{real} = &amp; \ \mathbb {E}_{x\sim p_{real}}[\log D_{real}(x)] + \\ ~ &amp; \ \mathbb {E}_{x\sim p_{fake}}[\log (1-D_{real}(x))]\\ \mathcal {L}_{cat} = &amp; \\mathbb {E}_{x,y\sim p_{fake}}[\text {CE}(D_{cat}(x), y)] \\ \mathcal {L}_{id} = &amp; \ \mathbb {E}_{x\sim p_{victim}}[\log D_{id}(x)] + \\ ~ &amp; \ \mathbb {E}_{x\sim p_{other}}[\log (1-D_{id}(x))],\\ \end {split} \label {eq:objectives} \end{equation}</div>
+<p><a id='x1-28r4'></a>
+<!-- l. 273 --></p><p class='indent'>  where <span class='mathjax-inline'>\(x \sim p_{victim}\)</span> and <span class='mathjax-inline'>\(x \sim p_{other}\)</span> denote the data sampled from the victim and the other clients, respectively. However, the samples from the victim or the
+other clients are inaccessible for the malicious server. Therefore, we estimate the representatives of each client based on their updates to
+the server. More details will be discussed later in section <a href='#x1-35r5'>V-E<!-- tex4ht:ref: subsec:client  --></a>. Note that <span class='mathjax-inline'>\(x\sim p_{real}\)</span> indicates samples from an auxiliary dataset, instead of from
+the clients. Since the federated learning always requires a testing set to evaluate the learning process, and the testing set tends to
+consistent to the global distribution of all the clients, we could adopt such testing set as real data to implement the real-fake task. The <span class='mathjax-inline'>\(\text {CE}(\cdot )\)</span>
+denotes the cross entropy. Updating <span class='mathjax-inline'>\(D\)</span> will minimize <span class='mathjax-inline'>\(\mathcal {L}_{real} + \mathcal {L}_{id}\)</span>, and updating <span class='mathjax-inline'>\(G\)</span> will minimize <span class='mathjax-inline'>\(\mathcal {L}_{cat} - \mathcal {L}_{real} + \mathcal {L}_{id}\)</span>. The training process of mGAN-AI will not
+affect  the  federated  learning,  thus  referred  to  as  passive  attack  whose  training  scheme  will  be  detailed  in  the  next
+section.
+</p><!-- l. 276 --><p class='indent' id='viadatasets-and-experiment-setup'>  
+<a id='x1-29r3'></a>
+  <span class='ptmri7t-'>C.  Passive Attack</span>
+<a id='Q1-1-3'></a>
+</p><!-- l. 278 --><p class='indent'>  In the passive attack, the malicious server is assumed to be honest-but-curious, meaning that it only analyzes the updates from the
+clients, rather than modifying the shared model or introducing adversarial influence. The training scheme is briefed in Algorithm <a href='#x1-32r1'>1<!-- tex4ht:ref: alg:passive_attack  --></a>. The
+shared model <span class='mathjax-inline'>\(M\)</span>, discriminator <span class='mathjax-inline'>\(D\)</span>, and generator <span class='mathjax-inline'>\(G\)</span> are initialized randomly. The inputs to mGAN-AI are the shared model <span class='mathjax-inline'>\(M_t\)</span> and updates <span class='mathjax-inline'>\(u_t^k\)</span> (<span class='mathjax-inline'>\(k=1,2,\cdots ,N\)</span>
+and <span class='mathjax-inline'>\(N\ge 2\)</span>) from the <span class='mathjax-inline'>\(k\)</span>th client at each iteration <span class='mathjax-inline'>\(t\)</span>. Besides, an auxiliary set <span class='mathjax-inline'>\(X_{aux}\)</span> is prepared for the training, and a victim indexed by <span class='mathjax-inline'>\(v\)</span> is
+specified.
+</p><!-- l. 280 --><p class='indent'>  At the <span class='mathjax-inline'>\(t\)</span>th iteration, the current shared model <span class='mathjax-inline'>\(M_t\)</span> is sent to the clients, then the clients send the updates back to the server. Following the
+rule of federated learning, those updates are averaged and added to <span class='mathjax-inline'>\(M_t\)</span>, obtaining the shared model for the next iteration. The
+discriminator <span class='mathjax-inline'>\(D\)</span> is initialized by <span class='mathjax-inline'>\(M_t+u_t^v\)</span> at each iteration to keep updated to the latest performance of categorization and to bias <span class='mathjax-inline'>\(D\)</span> towards the
+victim, assisting the attack targeting the victim. As aforementioned that the identification task requires the samples/representatives from
+each client. The data representatives are calculated from those updates of the clients (for more details, please refer to section <a href='#x1-35r5'>V-E<!-- tex4ht:ref: subsec:client  --></a>).
+Finally, <span class='mathjax-inline'>\(D\)</span> and <span class='mathjax-inline'>\(G\)</span> are updated sequentially based on the objectives in Eq. <a href='#x1-28r4'>4<!-- tex4ht:ref: eq:objectives  --></a>, where the auxiliary set <span class='mathjax-inline'>\(X_{aux}\)</span> is considered as the real data,
+and the generated samples <span class='mathjax-inline'>\(X_{fake}\)</span> by <span class='mathjax-inline'>\(G\)</span> are the fake data. The two datasets are fed to <span class='mathjax-inline'>\(\mathcal {L}_{real}\)</span>, achieving the real-fake task. For the
+identification task (i.e., <span class='mathjax-inline'>\(\mathcal {L}_{id}\)</span>), the representatives from <span class='mathjax-inline'>\(u_t^v\)</span> is treated as samples from the victim, and those from <span class='mathjax-inline'>\(u_t^k~(k \ne v)\)</span> are from
+others.
+</p><!-- l. 284 --><p class='indent'>  The update of <span class='mathjax-inline'>\(D\)</span> and <span class='mathjax-inline'>\(G\)</span> can be written as Eq. <a href='#x1-30r5'>5<!-- tex4ht:ref: eq:updateGAN  --></a>. </p><div class='mathjax-env mathjax-equation'>\begin{equation} \begin {split} D &amp;= D - \eta _1\nabla _{\theta _D} (\mathcal {L}_{real} + \mathcal {L}_{id}) \\ G &amp;= G - \eta _2\nabla _{\theta _G} (\mathcal {L}_{cat} - \mathcal {L}_{real} + \mathcal {L}_{id}), \end {split} \label {eq:updateGAN} \end{equation}</div>
+<p><a id='x1-30r5'></a>
+<!-- l. 292 --></p><p class='indent'>  where <span class='mathjax-inline'>\(\eta _1\)</span> and <span class='mathjax-inline'>\(\eta _2\)</span> denote the learning rates, and <span class='mathjax-inline'>\(\theta _D\)</span> and <span class='mathjax-inline'>\(\theta _G\)</span> indicate the parameters of <span class='mathjax-inline'>\(D\)</span> and <span class='mathjax-inline'>\(G\)</span>, respectively. <a id='x1-31r1'></a>
+                                                                                                  
+                                                                                                  
+</p><!-- l. 293 --><p class='indent'>  </p><hr class='float' /><div class='float' id='x1-passive-attack-of-mganai'>
+                                                                                                  
+                                                                                                  
+                                                                                                  
+                                                                                                  
+__________________________________________________________________________________________________
+  <span class='ptmb7t-'>Algorithm 1:</span> Passive attack of mGAN-AI_____________________________________________________________________________________________________________________________________ <a id='x1-32r1'></a>
+    <a id='x1-33'></a>
+    <span class='ptmb7t-'>Input:</span> The
+                shared
+                model
+                <span class='mathjax-inline'>\(M_t\)</span>,
+                updates
+                <span class='mathjax-inline'>\(u^k_t\)</span>
+                from
+                clients,
+                auxiliary
+                set
+                <span class='mathjax-inline'>\(X_{aux}\)</span>,
+                and
+                target
+                client
+                <span class='mathjax-inline'>\(v\)</span>.
+    <span class='ptmb7t-'>Output:</span> The
+                   generator
+                   <span class='mathjax-inline'>\(G\)</span>
+    Initialize
+      <span class='mathjax-inline'>\(M_0\)</span>,
+      <span class='mathjax-inline'>\(G\)</span>,
+      and
+      <span class='mathjax-inline'>\(D\)</span><br />
+    <span class='ptmb7t-'>for</span> 
+    <span class='ptmri7t-'>t
+    =
+    0
+    to
+    T</span> <span class='ptmb7t-'>do</span>
+      <!-- l. 321 --><p class='noindent'>
+    </p><!-- l. 321 --><p class='noindent'>Send
+    <span class='mathjax-inline'>\(M_{t}\)</span>
+    to
+    the
+    clients<br />
+    Receive
+    updates
+    from
+    the
+    clients,
+    <span class='mathjax-inline'>\(\{u_t^1, u_t^2, \cdots , u_t^v, \cdots , u_t^{N} \}\)</span><br />
+    Update
+    the
+    shared
+    model
+    using
+    the
+    updates,
+    <span class='mathjax-inline'>\(\displaystyle M_{t+1} = M_{t} + \frac {1}{N}\sum _{k=1}^{N}u^k_t\)</span>;
+    </p><!-- l. 321 --><p class='noindent'>Initialize
+    <span class='mathjax-inline'>\(D\)</span>
+    by
+    the
+    shared
+    model
+    and
+    update
+    <span class='mathjax-inline'>\(u_t^v\)</span>,
+    <span class='mathjax-inline'>\(D \leftarrow M_{t} + u_t^v\)</span><br />
+    <span class='ptmb7t-'>for</span> <span class='ptmri7t-'>k=1
+    to
+    N</span> <span class='ptmb7t-'>do</span> </p> <!-- l. 321 --><p class='noindent'> 
+</p><!-- l. 321 --><p class='noindent'>
+    </p><!-- l. 321 --><p class='noindent'>Calculate
+    data
+    representatives
+    <span class='mathjax-inline'>\(X_k\)</span>
+    from
+    <span class='mathjax-inline'>\(u_t^k\)</span><br />
+    <span class='ptmb7t-'>if</span> <span class='mathjax-inline'>\(k\)
+    </span><span class='ptmri7t-'>==
+    </span><span class='mathjax-inline'>\(v\)</span> <span class='ptmb7t-'>then</span> </p> <!-- l. 321 --><p class='noindent'> 
+</p><!-- l. 321 --><p class='noindent'>
+    </p><!-- l. 321 --><p class='noindent'>label
+    <span class='mathjax-inline'>\(X_k\)</span>
+    as
+    victim </p> <!-- l. 321 --><p class='noindent'><span class='ptmb7t-'>end</span>
+    </p><!-- l. 321 --><p class='noindent'><span class='ptmb7t-'>else</span> </p> <!-- l. 321 --><p class='noindent'> 
+</p><!-- l. 321 --><p class='noindent'>
+    </p><!-- l. 321 --><p class='noindent'>label
+    <span class='mathjax-inline'>\(X_k\)</span>
+    as
+    others </p> <!-- l. 321 --><p class='noindent'><span class='ptmb7t-'>end</span>
+    </p><!-- l. 321 --><p class='noindent'><span class='ptmb7t-'>end</span>
+    </p><!-- l. 321 --><p class='noindent'>Get
+    fake
+    samples
+    <span class='mathjax-inline'>\(X_{fake}\)</span>
+    from
+    <span class='mathjax-inline'>\(G\)</span><br />
+    Update
+    <span class='mathjax-inline'>\(D\)</span>
+    by
+    minimizing
+    <span class='mathjax-inline'>\(\mathcal {L}_{real} + \mathcal {L}_{id}\)</span>,
+    feeding
+    <span class='mathjax-inline'>\(X_{aux}\)</span>,
+    <span class='mathjax-inline'>\(X_{fake}\)</span>,
+    and
+    <span class='mathjax-inline'>\(X_k\)</span>
+    (<span class='mathjax-inline'>\(k=1,2,\cdots ,N\)</span>)<br />
+    Update
+    <span class='mathjax-inline'>\(G\)</span>
+    by
+    minimizing
+    <span class='mathjax-inline'>\(\mathcal {L}_{cat} - \mathcal {L}_{real} + \mathcal {L}_{id}\)</span> </p> <!-- l. 321 --><p class='noindent'><span class='ptmb7t-'>end</span>____________________________________________________________________________________________________________________________________________________________________________________________________
+                                                                                                  
+                                                                                                  
+                                                                                                  
+</p>
+  </div><hr class='endfloat' />
+<!-- l. 324 --><p class='indent'>  To achieve better performance, a balanced training on <span class='mathjax-inline'>\(D\)</span> is required, trained on balanced real and fake data. Since the parameters of <span class='mathjax-inline'>\(D\)</span>
+are overwritten by the shared model which is trained more on the real data as the time of iteration increases, we propose to increase the
+training epoch of <span class='mathjax-inline'>\(D\)</span> as <span class='mathjax-inline'>\(t\)</span> increases, thus to compensate the lack of fake data during the training. The training will repeat until meeting the
+stop criteria: 1) the federated learning reaches the maximum iteration, or 2) the malicious server achieves desired results, i.e.,
+the classification accuracy of the generated samples from <span class='mathjax-inline'>\(G\)</span> converges above certain threshold as tested on the shared
+model.
+</p><!-- l. 326 --><p class='indent' id='viadatasets-and-experiment-setup'>  
+<a id='x1-34r4'></a>
+  <span class='ptmri7t-'>D.  Active Attack</span>
+<a id='Q1-1-3'></a>
+</p><!-- l. 329 --><p class='indent'>  The passive attack is invisible but needs to analyze all updates from the clients. A more efficient and powerful way of attacking a
+specified client would be to isolate the victim from the others, i.e., training mGAN-AI on the victim alone by sending an
+isolated version of the shared model <span class='mathjax-inline'>\(M^{iso}\)</span> to the victim. Intuitively, it could be considered that the malicious server contains
+an affiliated server that only connects to the victim, and the shared model between them is <span class='mathjax-inline'>\(M^{iso}\)</span> instead of <span class='mathjax-inline'>\(M\)</span>. Initially, <span class='mathjax-inline'>\(M^{iso}_0 = M_0 = D\)</span>,
+where <span class='mathjax-inline'>\(M^{iso}\)</span> and <span class='mathjax-inline'>\(D\)</span> share the weights. Training mGAN-AI on the affiliated server by following the similar training scheme to
+the passive attack, the generator would yield samples with higher quality and more distinguishable identity because
+mGAN-AI is trained purely on the target real data. Note that the identification task (i.e., <span class='mathjax-inline'>\(\mathcal {L}_{id}\)</span>), as well as the calculation of
+representatives of clients, will be removed during the training because the victim is the only client w.r.t. the affiliated
+server.
+</p><!-- l. 331 --><p class='indent'>  Since the malicious server will “actively” send <span class='mathjax-inline'>\(M^{iso}\)</span> to the victim to obtain specific information, we call it active attack. Although
+the active attack violates the original rule of federated learning, it does not introduce negative effect to the federated
+learning.
+</p><!-- l. 333 --><p class='indent' id='viadatasets-and-experiment-setup'>  
+<a id='x1-35r5'></a>
+  <span class='ptmri7t-'>E.  Calculation of Client Representatives</span>
+<a id='Q1-1-3'></a>
+</p><!-- l. 335 --><p class='indent'>  In the identification task, data from the victim and other clients are required to train the discriminator, while the sever cannot directly
+access those data. Aono et al. <span class='cite'> [<a href='#Xaono2017privacy'>3</a>]</span> recovered the client data based on the update from the client, which is accessible for a malicious
+server in the federated learning. However, it is only suitable for a simple setting, where the shared model has to be a fully connected
+network, and the update is required to be obtained by training on a single sample. Obviously, these limitations significantly impede the
+adaptation of <span class='cite'> [<a href='#Xaono2017privacy'>3</a>]</span> to those widely adopted learning methods, e.g., convolution neural network, batch learning, etc. Inspired by <span class='cite'> [<a href='#Xaono2017privacy'>3</a>]</span>,
+we estimate the representative data of each client from its update sent to the server. The representatives of a client
+are defined to be synthesized samples that achieve the same update as the real samples after trained on the shared
+model.
+</p><!-- l. 341 --><p class='indent'>  As described in section <a href='#x1-29r3'>V-C<!-- tex4ht:ref: subsec:passive  --></a>, <span class='mathjax-inline'>\(u^k_t\)</span> is the update to the shared model <span class='mathjax-inline'>\(M_t\)</span> after training the data of the <span class='mathjax-inline'>\(k\)</span>th client on <span class='mathjax-inline'>\(M_t\)</span>. Specifically, <span class='mathjax-inline'>\(u^k_t\)</span> is obtained
+through backpropagation by minimizing the classification loss <span class='mathjax-inline'>\(\mathcal {L}\)</span> on the shared model. By the same token, the corresponding
+representatives <span class='mathjax-inline'>\(X_k\)</span> will be fed to <span class='mathjax-inline'>\(M_t\)</span> and calculate the update <span class='mathjax-inline'>\(u^{X_k}_t\)</span> through backpropagation by minimizing the same loss <span class='mathjax-inline'>\(\mathcal {L}\)</span>. Ideally, <span class='mathjax-inline'>\(u^k_t = u^{X_k}_t\)</span>. We
+adopt an optimization-based method to calculate <span class='mathjax-inline'>\(X_k\)</span> based on the shared model, then the objective can be expressed as
+</p><div class='mathjax-env mathjax-equation'>\begin{equation} \arg \underset {X_k}{\min }\| u_t^k - u^{X_k}_t \|_2,\; u^{X_k}_t = - \gamma \frac {\partial \mathcal {L}(X_k ; \theta _{M_t})}{\partial \theta _{M_t}}, \label {eq:rep_loss} \end{equation}</div>
+<p><a id='x1-36r6'></a>
+<!-- l. 346 --></p><p class='indent'>  where <span class='mathjax-inline'>\(\theta _{M_t}\)</span> denotes the parameters of the share model <span class='mathjax-inline'>\(M_t\)</span>, and <span class='mathjax-inline'>\(\gamma \)</span> is a scaling factor for balancing the magnitude of <span class='mathjax-inline'>\(u^{X_k}_t\)</span>. The initial
+representatives are drawn from random noise.
+</p><!-- l. 348 --><p class='indent'>  Since optimization-based methods tend to introduce noise or artifacts, Eq. <a href='#x1-36r6'>6<!-- tex4ht:ref: eq:rep_loss  --></a> is further regularized by the total variation (TV) <span class='cite'> [<a href='#Xmahendran2015understanding'>22</a>]</span>
+as expressed in the following. </p><div class='mathjax-env mathjax-equation'>\begin{equation} \mathcal {L}_{TV}(X_k) = \sum _{x\in X_k} \sum _{i,j} \left ( (x_{i,j+1}-x_{ij})^2+(x_{i+1,j} - x_{ij})^2 \right ) ^ \beta , \label {eq:rep_tv} \end{equation}</div>
+<p><a id='x1-37r7'></a>
+<!-- l. 354 --></p><p class='indent'>  where <span class='mathjax-inline'>\(X_k\)</span> is a set of images, and <span class='mathjax-inline'>\(i\)</span>, <span class='mathjax-inline'>\(j\)</span> are row and column indices of the image <span class='mathjax-inline'>\(x\)</span>. The <span class='mathjax-inline'>\(\mathcal {L}_{TV}\)</span> computes the neighborhood distance to encourage
+spatial smoothness of an image.
+</p><!-- l. 358 --><p class='indent'>  Finally, the objective of achieving valid representatives <span class='mathjax-inline'>\(X_k\)</span> for the <span class='mathjax-inline'>\(k\)</span>th client is </p><div class='mathjax-env mathjax-equation'>\begin{equation} \arg \underset {X_k}{\min }\left \| u_t^k - u^{X_k}_t \right \|_2 + \lambda \mathcal {L}_{TV}(X_k), \label {eq:loss_total} \end{equation}</div>
+<p><a id='x1-38r8'></a>
+<!-- l. 363 --></p><p class='indent'>  where <span class='mathjax-inline'>\(\lambda \)</span> balances the effect of TV. We calculate <span class='mathjax-inline'>\(X_k\)</span> by using the box-constrained L-BFGS. Empirically, valid <span class='mathjax-inline'>\(X_t\)</span> could be achieved after
+several updates. The experiments in section <a href='#x1-39r6'>VI<!-- tex4ht:ref: sec:experiment  --></a> validate the effectiveness of the representatives in the identification
+task.
+</p><!-- l. 366 --><p class='indent' id='viadatasets-and-experiment-setup'>  
+                                                                                                  
+                                                                                                  
+<a id='x1-39r6'></a>
+<span class='ptmrc7t-'>VI.  E<span class='small-caps'>xperimental</span> E<span class='small-caps'>valuation</span></span>
+<a id='Q1-1-3'></a>
+</p><!-- l. 368 --><p class='indent'>  In this section, we first clarify the dataset and experiment setup in Sec. <a href='#x1-40r1'>VI-A<!-- tex4ht:ref: subsec:datasets  --></a>. Then, effectiveness of the proposed mGAN-AI is
+validated in Sec. <a href='#x1-46r2'>VI-B<!-- tex4ht:ref: subsec:GANAI_Evaluation  --></a>. Finally, section <a href='#x1-52r3'>VI-C<!-- tex4ht:ref: subsec:Comparison  --></a> conducts qualitative and quantitative comparison between mGAN-AI and another two
+typical attacks, i.e., the model inversion (MI) attack and GAN-based attack.
+</p><!-- l. 370 --><p class='indent' id='viadatasets-and-experiment-setup'>  
+<a id='x1-40r1'></a>
+  <span class='ptmri7t-'>A.  Datasets and Experiment Setup</span>
+<a id='Q1-1-3'></a>
+</p><!-- l. 372 --><p class='indent'>  
+<a id='x1-41r1'></a>
+  It contains 70,000 handwritten digits images from 0 to 9 (i.e., 10 classes). The images are in gray scale with the size of 28<span class='mathjax-inline'>\(\times \)</span>28, and
+they are divided into the training set (60,000 samples) and testing set (10,000 samples).
+</p><!-- l. 375 --><p class='indent'>  
+<a id='x1-42r2'></a>
+  The AT&amp;T dataset consists of facial images from 40 different persons, namely 10 images per person. The images are in gray scale
+with the size of 92<span class='mathjax-inline'>\(\times \)</span>112. They were taken at different times and with large variation in facial expression (smiling or w/o smiling) and
+facial details (glasses or w/o glasses). We resize the images into 64<span class='mathjax-inline'>\(\times \)</span>64.
+</p><!-- l. 380 --><p class='indent'>  
+<a id='x1-43r3'></a>
+  As discussed in Sec. <a href='#x1-21r5'>V<!-- tex4ht:ref: sec:attack  --></a>, the proposed mGAN-AI involves three components: 1) classifier (i.e., the shared model), 2) discriminator,
+and 3) generator. The classifier and discriminator are constructed by convolutional neural networks, and they share the structure
+except the output layer. The generator is constructed with deconvolution layers. Tables <a href='#network-structure-for-mnist'>I<!-- tex4ht:ref: tab:nets_MINIST  --></a> and <a href='#network-structure-for-att'>II<!-- tex4ht:ref: tab:nets_att  --></a> show the network
+structures for MNIST and AT&amp;T, respectively. For the generator, the kernel size is <span class='mathjax-inline'>\(5\time 5\)</span> with the stride of 2. The input
+to the generator is formated as concatenation of random noise, categorical label, and identity label (Fig. <a href='#x1-24r2'>2b<!-- tex4ht:ref: fig:stru_mGAN-AI  --></a>), whose
+length are 100, 1, and 1, respectively. The embedding layer squeezes the length of input to 100. For the classifier
+and discriminator, the kernel size is <span class='mathjax-inline'>\(3\times 3\)</span>. Their output has the similar format as the input of the generator, i.e., the first
+digits for reality, the next <span class='mathjax-inline'>\(C\)</span> digits for category, and the last digit for identity. The <span class='mathjax-inline'>\(C\)</span> indicates the number of classes for
+different datasets, i.e., <span class='mathjax-inline'>\(C=10\)</span> for MNIST and <span class='mathjax-inline'>\(C=40\)</span> for AT&amp;T. The activation functions ReLU and LReLU are adopted in the
+generator and classifier/discriminator, respectively. In addition, batch normalization is used at the intermediate layers of the
+generator.
+</p><!-- l. 388 --><p class='indent'>  In the training of the classifier (i.e., shared model), the SGD optimizer is adopted with the learning rate of 0.002. For discriminator
+and generator (i.e., multi-task GAN), the Adam optimizer is used with the learning rate and momentum term to be
+0.0002  and  0.5,  respectively.  In  calculating  the  representatives,  the  box-constrained  L-BFGS  is  employed,  where  <span class='mathjax-inline'>\(\lambda = 0.00015\)</span>,
+<span class='mathjax-inline'>\(\beta =1.25\)</span>.
+                                                                                                  
+                                                                                                  
+</p><!-- l. 390 --><p class='indent'>  </p><hr class='float' /><div class='float' id='network-structure-for-mnist'>
+                                                                                                  
+                                                                                                  
+<a id='x1-44r1'></a>
+TABLE I: Network structure for MNIST
+<div class='tabular'> <table class='tabular' id='TBL-1'><colgroup id='TBL-1-1g'><col id='TBL-1-1' /></colgroup><colgroup id='TBL-1-2g'><col id='TBL-1-2' /></colgroup><tr class='hline'><td></td><td></td></tr><tr id='TBL-1-1-' style='vertical-align:baseline;'><td class='td11' id='TBL-1-1-1' style='white-space:normal; text-align:center;'> <!-- tex4ht:inline --><div class='tabular'> <table class='tabular' id='TBL-2'><colgroup id='TBL-2-1g'><col id='TBL-2-1' /></colgroup><tr id='TBL-2-1-' style='vertical-align:baseline;'><td class='td00' id='TBL-2-1-1' style='white-space:normal; text-align:center;'> Classifier/  </td></tr><tr id='TBL-2-2-' style='vertical-align:baseline;'><td class='td00' id='TBL-2-2-1' style='white-space:normal; text-align:center;'>Discriminator</td></tr></table>                                                                                                                                                                                   </div>  </td><td class='td11' id='TBL-1-1-2' style='white-space:normal; text-align:left;'> <!-- tex4ht:inline --><div class='tabular'> <table class='tabular' id='TBL-3'><colgroup id='TBL-3-1g'><col id='TBL-3-1' /></colgroup><tr id='TBL-3-1-' style='vertical-align:baseline;'><td class='td00' id='TBL-3-1-1' style='white-space:normal; text-align:left;'><span class='mathjax-inline'>\(28^2\times 1 \xrightarrow {\text {Conv (stride = 2)}} 14^2\times 32 \xrightarrow {\text {Conv (stride = 1)}} \)</span></td></tr><tr id='TBL-3-2-' style='vertical-align:baseline;'><td class='td00' id='TBL-3-2-1' style='white-space:normal; text-align:left;'><span class='mathjax-inline'>\(14^2\times 64 \xrightarrow {\text {Conv (stride = 2)}} 7^2\times 128 \xrightarrow {\text {Conv (stride = 1)}} \)</span></td>
+</tr><tr id='TBL-3-3-' style='vertical-align:baseline;'><td class='td00' id='TBL-3-3-1' style='white-space:normal; text-align:left;'><span class='mathjax-inline'>\(7^2\times 256 \xrightarrow {\text {FC}} 12,544\xrightarrow {\text {FC, Softmax}} (1, 10, 1)\)</span> </td></tr></table>                                                                                   </div> </td>
+</tr><tr class='hline'><td></td><td></td></tr><tr id='TBL-1-2-' style='vertical-align:baseline;'><td class='td11' id='TBL-1-2-1' style='white-space:normal; text-align:center;'>                                         Generator                                                                                                  </td><td class='td11' id='TBL-1-2-2' style='white-space:normal; text-align:left;'> <!-- tex4ht:inline --><div class='tabular'> <table class='tabular' id='TBL-4'><colgroup id='TBL-4-1g'><col id='TBL-4-1' /></colgroup><tr id='TBL-4-1-' style='vertical-align:baseline;'><td class='td00' id='TBL-4-1-1' style='white-space:normal; text-align:left;'><span class='mathjax-inline'>\((100,1,1)\xrightarrow {\text {Embedding}} 100 \xrightarrow {\text {FC}} 3^2\times 384 \xrightarrow {\text {Deconv}} \)</span></td></tr><tr id='TBL-4-2-' style='vertical-align:baseline;'><td class='td00' id='TBL-4-2-1' style='white-space:normal; text-align:left;'><span class='mathjax-inline'>\( 7^2\times 192 \xrightarrow {\text {Deconv}} 14^2\times 96 \xrightarrow {\text {Deconv, tanh}} 28^2\times 1\)</span></td></tr></table>                                                                                   </div> </td>
+</tr><tr class='hline'><td></td><td></td></tr></table>                                                                                                       </div>
+<div class='tablenotes'>
+<!-- l. 415 --><p class='noindent'>
+</p></div>
+</div><hr class='endfloat' />
+                                                                                                  
+                                                                                                  
+<!-- l. 420 --><p class='indent'>  </p><hr class='float' /><div class='float' id='network-structure-for-att'>
+                                                                                                  
+                                                                                                  
+<a id='x1-45r2'></a>
+TABLE II: Network structure for AT&amp;T
+<div class='tabular'> <table class='tabular' id='TBL-5'><colgroup id='TBL-5-1g'><col id='TBL-5-1' /></colgroup><colgroup id='TBL-5-2g'><col id='TBL-5-2' /></colgroup><tr class='hline'><td></td><td></td></tr><tr id='TBL-5-1-' style='vertical-align:baseline;'><td class='td11' id='TBL-5-1-1' style='white-space:normal; text-align:center;'> <!-- tex4ht:inline --><div class='tabular'> <table class='tabular' id='TBL-6'><colgroup id='TBL-6-1g'><col id='TBL-6-1' /></colgroup><tr id='TBL-6-1-' style='vertical-align:baseline;'><td class='td00' id='TBL-6-1-1' style='white-space:normal; text-align:center;'> Classifier/  </td></tr><tr id='TBL-6-2-' style='vertical-align:baseline;'><td class='td00' id='TBL-6-2-1' style='white-space:normal; text-align:center;'>Discriminator</td></tr></table>                                                                                                                                                                                   </div>  </td><td class='td11' id='TBL-5-1-2' style='white-space:normal; text-align:left;'> <!-- tex4ht:inline --><div class='tabular'> <table class='tabular' id='TBL-7'><colgroup id='TBL-7-1g'><col id='TBL-7-1' /></colgroup><tr id='TBL-7-1-' style='vertical-align:baseline;'><td class='td00' id='TBL-7-1-1' style='white-space:normal; text-align:left;'><span class='mathjax-inline'>\(64^2\times 1 \xrightarrow {\text {Conv (stride = 2)}} 32^2\times 32 \xrightarrow {\text {Conv (stride = 1)}} \)</span></td></tr><tr id='TBL-7-2-' style='vertical-align:baseline;'><td class='td00' id='TBL-7-2-1' style='white-space:normal; text-align:left;'><span class='mathjax-inline'>\(32^2\times 64 \xrightarrow {\text {Conv (stride = 2)}} 16^2\times 128 \xrightarrow {\text {Conv (stride = 2)}} \)</span></td>
+</tr><tr id='TBL-7-3-' style='vertical-align:baseline;'><td class='td00' id='TBL-7-3-1' style='white-space:normal; text-align:left;'><span class='mathjax-inline'>\(8^2\times 256 \xrightarrow {\text {FC}} 16,384\xrightarrow {\text {FC, Softmax}} (1,40,1)\)</span> </td></tr></table>                                                                                   </div> </td>
+</tr><tr class='hline'><td></td><td></td></tr><tr id='TBL-5-2-' style='vertical-align:baseline;'><td class='td11' id='TBL-5-2-1' style='white-space:normal; text-align:center;'>                                         Generator                                                                                                  </td><td class='td11' id='TBL-5-2-2' style='white-space:normal; text-align:left;'> <!-- tex4ht:inline --><div class='tabular'> <table class='tabular' id='TBL-8'><colgroup id='TBL-8-1g'><col id='TBL-8-1' /></colgroup><tr id='TBL-8-1-' style='vertical-align:baseline;'><td class='td00' id='TBL-8-1-1' style='white-space:normal; text-align:left;'><span class='mathjax-inline'>\((100,1,1)\xrightarrow {\text {Embedding}} 100 \xrightarrow {\text {FC}}4^4\times 512\xrightarrow {\text {Deconv}} \)</span></td></tr><tr id='TBL-8-2-' style='vertical-align:baseline;'><td class='td00' id='TBL-8-2-1' style='white-space:normal; text-align:left;'><span class='mathjax-inline'>\(8^2\times 256 \xrightarrow {\text {Deconv}} 16^2\times 128 \xrightarrow {\text {Deconv}} \)</span></td>
+</tr><tr id='TBL-8-3-' style='vertical-align:baseline;'><td class='td00' id='TBL-8-3-1' style='white-space:normal; text-align:left;'><span class='mathjax-inline'>\(32^2\times 256 \xrightarrow {\text {Deconv}} 64^2\times 256 \xrightarrow {\text {Deconv, tanh}} 64^2\times 1\)</span> </td></tr></table>                                                                                   </div> </td>
+</tr><tr class='hline'><td></td><td></td></tr></table>                                                                                                       </div>
+<div class='tablenotes'>
+<!-- l. 447 --><p class='noindent'>
+<span class='mathjax-inline'>\(m^2\times n\) </span><span class='ptmr7t-x-x-80'>denotes the size of a layer, i.e., </span><span class='mathjax-inline'>\(m\times m\) </span><span class='ptmr7t-x-x-80'>map with </span><span class='mathjax-inline'>\(n\) </span><span class='ptmr7t-x-x-80'>channels.</span></p></div>
+</div><hr class='endfloat' />
+<!-- l. 454 --><p class='indent' id='vibclientlevel-privacy-attack-by-mganai'>  
+<a id='x1-46r2'></a>
+  <span class='ptmri7t-'>B.  Client-level Privacy Attack by mGAN-AI</span>
+<a id='Q1-1-5'></a>
+</p><!-- l. 456 --><p class='indent'>  This section evaluates the effectiveness of passive mGAN-AI by comparing the reconstructed samples with the real samples of the
+victim. Instead of evenly splitting the training data to the clients, we simulate biased data distribution on clients according to the setting
+of federated learning. In addition, opposite to <span class='cite'> [<a href='#Xhitaj2017deep'>4</a>]</span> that assumed each client consists of a single class, we achieve more flexible
+condition that each client could own samples from multiple classes. Note that different clients may share the samples from the same
+class.
+</p>
+  <hr class='figure' /><div class='figure'>
+                                                                                                  
+                                                                                                  
+                                                                                                  
+                                                                                                  
+<!-- l. 463 --><p class='noindent' id='the-results-of-mganaion-the-mnist-dataset-the-first-two-rows-are-the-real-samples-from-the-other-clients-and-the-victim-the-next-two-rows-are-corresponding-representatives-calculated-from-other-xk-k-v-and-victim-xv-the-last-row-is-the-reconstructed-samples-by-mganai-which-are-similar-to-those-of-the-victim-presenting-larger-rotation-as-compared-to-those-of-the-other-clients'><span class='rotatebox' style='transform: rotate(-90deg);'>  <span class='ptmr7t-x-x-80'>Output    </span><span class='mathjax-inline'>\(X_v\)    \(X_k\) </span><span class='ptmr7t-x-x-80'>     Victim   Other</span> </span><img alt='PIC' height='490' src='pic/mnist-.png' width='490' /> <a id='x1-47r4'></a>
+Fig. 4:  The  results  of  mGAN-AI on  the  MNIST  dataset.  The  first  two  rows  are  the  real  samples  from  the  other  clients  and
+the victim. The next two rows are corresponding representatives calculated from other (<span class='mathjax-inline'>\(X_k\)</span>, <span class='mathjax-inline'>\(k \ne v\)</span>) and victim (<span class='mathjax-inline'>\(X_v\)</span>). The last row is the
+reconstructed samples by mGAN-AI, which are similar to those of the victim, presenting larger rotation as compared to those
+of the other clients.
+                                                                                                  
+                                                                                                  
+</p>
+  </div><hr class='endfigure' />
+<!-- l. 477 --><p class='indent'>  
+<a id='x1-48r1'></a>
+  We set the number of client <span class='mathjax-inline'>\(N=10\)</span>. Each client randomly draws 100 samples from three random classes as its private data. To gain
+distinguishable properties for the victim, we rotate the samples of the victim by InfoGAN <span class='cite'> [<a href='#Xchen2016infogan'>21</a>]</span>, which could synthesize rotated version
+of the digits. Ideally, mGAN-AI should reconstruct rotated digits owned by the victim. Fig. <a href='#the-results-of-mganaion-the-mnist-dataset-the-first-two-rows-are-the-real-samples-from-the-other-clients-and-the-victim-the-next-two-rows-are-corresponding-representatives-calculated-from-other-xk-k-v-and-victim-xv-the-last-row-is-the-reconstructed-samples-by-mganai-which-are-similar-to-those-of-the-victim-presenting-larger-rotation-as-compared-to-those-of-the-other-clients'>4<!-- tex4ht:ref: fig:mnist  --></a> shows the reconstructed client-level
+samples by mGAN-AI in the federated learning. The first two rows are the samples from other clients and the victim, respectively.
+The 3rd and 4th rows are the corresponding representatives (<span class='mathjax-inline'>\(X_k\)</span> in Algorithm <a href='#x1-32r1'>1<!-- tex4ht:ref: alg:passive_attack  --></a>) calculated from other clients and the
+victim. The last row shows the reconstructed samples, which is indistinguishable from the second row (victim) and
+different from the first row (other) in rotation obviously. Note that ten classes are presented in Fig. <a href='#the-results-of-mganaion-the-mnist-dataset-the-first-two-rows-are-the-real-samples-from-the-other-clients-and-the-victim-the-next-two-rows-are-corresponding-representatives-calculated-from-other-xk-k-v-and-victim-xv-the-last-row-is-the-reconstructed-samples-by-mganai-which-are-similar-to-those-of-the-victim-presenting-larger-rotation-as-compared-to-those-of-the-other-clients'>4<!-- tex4ht:ref: fig:mnist  --></a> for the victim
+because the experiment is repeated, so that the victim could walk through all possible classes. This demonstrates that
+mGAN-AI can successfully and precisely recover the provide data of the victim, i.e., compromising the client-level
+privacy.
+</p>
+  <hr class='figure' /><div class='figure'>
+                                                                                                  
+                                                                                                  
+                                                                                                  
+                                                                                                  
+<!-- l. 488 --><p class='noindent' id='the-results-of-mganaion-the-att-dataset-the-top-two-rows-are-real-samples-from-the-victim-and-other-clients-respectively-the-corresponding-representatives-are-shown-in-the-next-two-rows-the-last-row-is-the-reconstructed-samples-which-show-that-mganaiwould-specifically-recover-clientdependent-property-ie-wearing-glasses'> <img alt='PIC' height='336' src='pic/att-.png' width='516' /> <a id='x1-49r5'></a>
+Fig. 5: The results of mGAN-AI on the AT&amp;T dataset. The top two rows are real samples from the victim and other clients,
+respectively.  The  corresponding  representatives  are  shown  in  the  next  two  rows.  The  last  row  is  the  reconstructed  samples,
+which show that mGAN-AI would specifically recover client-dependent property, i.e., wearing glasses.
+                                                                                                  
+                                                                                                  
+</p>
+  </div><hr class='endfigure' />
+<!-- l. 495 --><p class='indent'>  
+<a id='x1-50r2'></a>
+  The similar experiment is performed on the AT&amp;T dataset, where the number of clients <span class='mathjax-inline'>\(N=10\)</span>. The distinguishable property of the victim
+is assigned to be wearing glasses. As shown in Fig. <a href='#the-results-of-mganaion-the-att-dataset-the-top-two-rows-are-real-samples-from-the-victim-and-other-clients-respectively-the-corresponding-representatives-are-shown-in-the-next-two-rows-the-last-row-is-the-reconstructed-samples-which-show-that-mganaiwould-specifically-recover-clientdependent-property-ie-wearing-glasses'>5<!-- tex4ht:ref: fig:att  --></a>, the first row shows the private data of the victim, i.e., two faces wearing glasses.
+The second row are faces from other clients that do not wear glasses. Note that the first two faces in the second row are the same
+person as in the first row. Therefore, successfully attack to the victim should be reconstruction of the first two person
+wearing  glasses.  The  3rd  and  4th  rows  are  corresponding  representatives.  The  last  row  are  reconstructed  samples,
+where the first two samples are identical to the victim while the rest are significantly distorted. This demonstrates
+that mGAN-AI could only clearly reconstruct the private data of the victim, i.e., mGAN-AI specifically attacks the
+victim.
+</p><!-- l. 500 --><p class='indent'>  Note that mGAN-AI does not violate the differential privacy (DP), which aims to prevent the recovery of specific samples used
+during the training. In other words, DP tries to make the adversary fail to tell whether a given sample belongs to the training set.
+However, without inferring the membership of a given sample, it can still generate samples distinguishable from real samples as
+demonstrated in Figs. <a href='#the-results-of-mganaion-the-mnist-dataset-the-first-two-rows-are-the-real-samples-from-the-other-clients-and-the-victim-the-next-two-rows-are-corresponding-representatives-calculated-from-other-xk-k-v-and-victim-xv-the-last-row-is-the-reconstructed-samples-by-mganai-which-are-similar-to-those-of-the-victim-presenting-larger-rotation-as-compared-to-those-of-the-other-clients'>4<!-- tex4ht:ref: fig:mnist  --></a> and <a href='#the-results-of-mganaion-the-att-dataset-the-top-two-rows-are-real-samples-from-the-victim-and-other-clients-respectively-the-corresponding-representatives-are-shown-in-the-next-two-rows-the-last-row-is-the-reconstructed-samples-which-show-that-mganaiwould-specifically-recover-clientdependent-property-ie-wearing-glasses'>5<!-- tex4ht:ref: fig:att  --></a>, which obviously leads severe privacy violation. Besides, convergence of the shared model requires
+a relatively loose privacy budget when applying DP in the federated learning <span class='cite'> [<a href='#Xmelis2018inference'>6</a>]</span>, which means the magnitude of
+the perturbation should be carefully controlled to ensure high-utility updates used for training the multi-task GAN in
+mGAN-AI.
+</p>
+  <hr class='figure' /><div class='figure'>
+                                                                                                  
+                                                                                                  
+                                                                                                  
+                                                                                                  
+<!-- l. 506 --><p class='noindent' id='comparison-of-reconstructed-samples-by-mganai-mi-attack-and-ganbased-attack-the-top-row-is-the-real-samples-and-the-rest-are-the-reconstructed-samples-by-the-passive-mganai-active-mganai-mi-attack-and-ganbased-attack-respectively'> <img alt='PIC' height='490' src='pic/compared-.png' width='490' /> <a id='x1-51r6'></a>
+Fig. 6: Comparison of reconstructed samples by mGAN-AI, MI attack, and GAN-based attack. The top row is the real samples,
+and  the  rest  are  the  reconstructed  samples  by  the  passive  mGAN-AI,  active  mGAN-AI,  MI  attack,  and  GAN-based  attack,
+respectively.
+                                                                                                  
+                                                                                                  
+</p>
+  </div><hr class='endfigure' />
+<!-- l. 514 --><p class='indent' id='vicquantitative-and-qualitative-comparison'>  
+<a id='x1-52r3'></a>
+  <span class='ptmri7t-'>C.  Quantitative and Qualitative Comparison</span>
+<a id='Q1-1-8'></a>
+</p><!-- l. 516 --><p class='indent'>  This section compares mGAN-AI with two state-of-the-art attacking models, i.e., inversion attack (MI) and GAN-based attack, in
+aspects of reconstruction quality of the victim and side effect to the federated learning. For fair comparison, the same experiment setup
+is followed in the federated learning, the same dataset AT&amp;T is adopted, and the number of clients <span class='mathjax-inline'>\(N=20\)</span>. The results are shown
+in Fig. <a href='#comparison-of-reconstructed-samples-by-mganai-mi-attack-and-ganbased-attack-the-top-row-is-the-real-samples-and-the-rest-are-the-reconstructed-samples-by-the-passive-mganai-active-mganai-mi-attack-and-ganbased-attack-respectively'>6<!-- tex4ht:ref: fig:compared  --></a>, where the first row are real samples from the victim.  The second and third rows are passive attack and
+active attack of mGAN-AI, respectively. The last two rows are reconstructions by MI attack and GAN-based attack,
+respectively.
+</p><!-- l. 520 --><p class='indent'>  Comparing the results from the proposed mGAN-AI with MI and GAN-based attack, mGAN-AI generates samples with much
+higher quality and more identical to the real samples. The results of MI attack is significantly blurry, consistent with the results in <span class='cite'>
+ [<a href='#Xhitaj2017deep'>4</a>, <a href='#Xshokri2017membership'>17</a>]</span>. The failure is mainly caused by simply maximizing the model output w.r.t. a target label, which would lead to uninterpretable
+samples when dealing with complicated neural networks. sharing the spirit with another threat for deep learning — adversarial
+examples <span class='cite'> [<a href='#Xszegedy2013intriguing'>23</a>]</span>. The results of GAN-based attack do not converge at all because it heavily relies on the introduced “adversarial
+influence” which would be averaged (become trivial) before adding to the shared model. The results of GAN-based attack are consistent
+with those in its original work, where unrecognizable images were generated without the adversarial influence. Comparing the passive
+and active attack of mGAN-AI, the active attack performs better but it would slightly degrade the learned model in the
+federated learning. By contrast, the passive learning does not effect the learning model, which will be demonstrated
+later.
+</p><!-- l. 527 --><p class='indent'>  To quantitatively evaluate the generated images, the inception score <span class='cite'> [<a href='#Xsalimans2016improved'>24</a>]</span> is used to statistically compare the three attack models.
+Inception score has been widely adopted in image quality evaluation, especially in the area of image synthesis. We generate 400
+samples from each of the three attacks and compute the inception score for each method. The results are shown in Table <a href='#quantitative-comparison-on-inception-score'>III<!-- tex4ht:ref: tab:inception_score  --></a>, where the
+proposed mGAN-AI shows higher score than MI and GAN-based attack, demonstrating that mGAN-AI generates samples with higher
+quality.
+                                                                                                  
+                                                                                                  
+</p><!-- l. 529 --><p class='indent'>  </p><hr class='float' /><div class='float' id='quantitative-comparison-on-inception-score'>
+                                                                                                  
+                                                                                                  
+<a id='x1-53r3'></a>
+TABLE III: Quantitative Comparison on Inception Score
+<div class='tabular'> <table class='tabular' id='TBL-9'><colgroup id='TBL-9-1g'><col id='TBL-9-1' /></colgroup><colgroup id='TBL-9-2g'><col id='TBL-9-2' /></colgroup><tr class='hline'><td></td><td></td></tr><tr id='TBL-9-1-' style='vertical-align:baseline;'><td class='td11' id='TBL-9-1-1' style='white-space:normal; text-align:left; vertical-align:middle;'> <!-- l. 534 --><p class='noindent'>               </p></td><td class='td11' id='TBL-9-1-2' style='white-space:normal; text-align:left; vertical-align:middle;'> <!-- l. 534 --><p class='noindent'>Inception Score           </p></td>
+</tr><tr class='hline'><td></td><td></td></tr><tr id='TBL-9-2-' style='vertical-align:baseline;'><td class='td11' id='TBL-9-2-1' style='white-space:normal; text-align:left; vertical-align:middle;'> <!-- l. 535 --><p class='noindent'>Real Images                  </p></td><td class='td11' id='TBL-9-2-2' style='white-space:normal; text-align:left; vertical-align:middle;'> <!-- l. 535 --><p class='noindent'>1.55 <span class='mathjax-inline'>\(\pm \)</span> 0.04                    </p></td>
+</tr><tr id='TBL-9-3-' style='vertical-align:baseline;'><td class='td11' id='TBL-9-3-1' style='white-space:normal; text-align:left; vertical-align:middle;'> <!-- l. 536 --><p class='noindent'>Passive mGAN-AI       </p></td><td class='td11' id='TBL-9-3-2' style='white-space:normal; text-align:left; vertical-align:middle;'> <!-- l. 536 --><p class='noindent'>1.42 <span class='mathjax-inline'>\(\pm \)</span> 0.02                    </p></td>
+</tr><tr id='TBL-9-4-' style='vertical-align:baseline;'><td class='td11' id='TBL-9-4-1' style='white-space:normal; text-align:left; vertical-align:middle;'> <!-- l. 537 --><p class='noindent'>Active mGAN-AI         </p></td><td class='td11' id='TBL-9-4-2' style='white-space:normal; text-align:left; vertical-align:middle;'> <!-- l. 537 --><p class='noindent'>1.61 <span class='mathjax-inline'>\(\pm \)</span> 0.05                    </p></td>
+</tr><tr id='TBL-9-5-' style='vertical-align:baseline;'><td class='td11' id='TBL-9-5-1' style='white-space:normal; text-align:left; vertical-align:middle;'> <!-- l. 538 --><p class='noindent'>GAN-based attack        </p></td><td class='td11' id='TBL-9-5-2' style='white-space:normal; text-align:left; vertical-align:middle;'> <!-- l. 538 --><p class='noindent'>1.18 <span class='mathjax-inline'>\(\pm \)</span> 0.03                    </p></td>
+</tr><tr id='TBL-9-6-' style='vertical-align:baseline;'><td class='td11' id='TBL-9-6-1' style='white-space:normal; text-align:left; vertical-align:middle;'> <!-- l. 539 --><p class='noindent'>MI attack                      </p></td><td class='td11' id='TBL-9-6-2' style='white-space:normal; text-align:left; vertical-align:middle;'> <!-- l. 539 --><p class='noindent'>1.01 <span class='mathjax-inline'>\(\pm \)</span> 0.03                    </p></td>
+</tr><tr class='hline'><td></td><td></td></tr></table>                                                                             </div>
+                                                                                                  
+                                                                                                  
+  </div><hr class='endfloat' />
+  <hr class='figure' /><div class='figure'>
+                                                                                                  
+                                                                                                  
+                                                                                                  
+                                                                                                  
+<!-- l. 548 --><p class='noindent' id='the-accuracy-of-the-shared-model-at-each-iteration-in-the-federated-learning-when-mounting-different-attacks'> <img alt='PIC' height='490' src='pic/accuracy-.png' width='490' /> <a id='x1-54r7'></a>
+Fig. 7: The accuracy of the shared model at each iteration in the federated learning when mounting different attacks.
+                                                                                                  
+                                                                                                  
+</p>
+  </div><hr class='endfigure' />
+<!-- l. 555 --><p class='indent'>  Finally, we investigate the side effect of the three attacking models to the federated learning. Fig. <a href='#the-accuracy-of-the-shared-model-at-each-iteration-in-the-federated-learning-when-mounting-different-attacks'>7<!-- tex4ht:ref: fig:side_effect  --></a> shows the accuracy of the shared
+model at each iteration in the federated learning when performing different attacks, i.e, passive mGAN-AI, active mGAN-AI, and
+GAN-based attack. The GAN-based attack significantly reduces the accuracy and presents drastic oscillation (non convergence) because
+it introduces adversarial influence. The passive mGAN-AI achieves the highest accuracy because it does not affect the training process
+of federated learning. The active mGAN-AI gets a bit lower but stable accuracy. With this cost, however, it achieves better
+reconstruction quality as shown in Fig. <a href='#comparison-of-reconstructed-samples-by-mganai-mi-attack-and-ganbased-attack-the-top-row-is-the-real-samples-and-the-rest-are-the-reconstructed-samples-by-the-passive-mganai-active-mganai-mi-attack-and-ganbased-attack-respectively'>6<!-- tex4ht:ref: fig:compared  --></a>.
+</p><!-- l. 559 --><p class='indent' id='references'>  
+<a id='x1-55r7'></a>
+<span class='ptmrc7t-'>VII.  C<span class='small-caps'>onclusions</span></span>
+<a id='Q1-1-10'></a>
+</p><!-- l. 562 --><p class='indent'>  This paper investigated the privacy risk of federated learning, which is considered as a privacy-preserving learning framework
+working in a decentralized manner. Against federated learning, we proposed a generic and practical reconstruction attack named
+mGAN-AI, which enables a malicious server to not only reconstruct the actual training samples, but also target a specific client and
+compromise the client-level privacy. The proposed attack does not affect the standard training process, showing obvious advantages over
+the current attack mechanisms. The extensive experimental results on two benchmark datasets demonstrate that the
+mGAN-AI can reconstruct samples that resemble the victim’s training samples, outperforming the state-of-the-art attacking
+algorithms.
+</p><!-- l. 2 --><p class='indent' id='references'>  
+  <span class='ptmrc7t-'>R<span class='small-caps'>eferences</span></span>
+<a id='Q1-1-10'></a>
+</p><!-- l. 2 --><p class='indent'>
+   </p><div class='thebibliography'>
+   <p class='bibitem'><span class='biblabel'>
+ <span class='ptmr7t-x-x-80'>[1] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xshokri2015privacy'></a><span class='ptmr7t-x-x-80'>R. Shokri and V. Shmatikov, “Privacy-preserving deep learning,” in </span><span class='ptmri7t-x-x-80'>Proc. of ACM CCS</span><span class='ptmr7t-x-x-80'>, 2015, pp. 1310–1321.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+ <span class='ptmr7t-x-x-80'>[2] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xmcmahan2016communication'></a><span class='ptmr7t-x-x-80'>H. B. McMahan, E. Moore, D. Ramage, S. Hampson, and B. A. y. Arcas, “Communication-efficient learning of deep networks from decentralized
+   data,” </span><span class='ptmri7t-x-x-80'>arXiv preprint arXiv:1602.05629</span><span class='ptmr7t-x-x-80'>, 2016.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+ <span class='ptmr7t-x-x-80'>[3] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xaono2017privacy'></a><span class='ptmr7t-x-x-80'>Y. Aono,  T. Hayashi,  L. Wang,  S. Moriai  </span><span class='ptmri7t-x-x-80'>et al.</span><span class='ptmr7t-x-x-80'>,  “Privacy-preserving  deep  learning:  Revisited  and  enhanced,”  in  </span><span class='ptmri7t-x-x-80'>Proc.  of  ATIS</span><span class='ptmr7t-x-x-80'>.    Springer,  2017,
+   pp. 100–110.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+ <span class='ptmr7t-x-x-80'>[4] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xhitaj2017deep'></a><span class='ptmr7t-x-x-80'>B. Hitaj,  G. Ateniese,  and  F. Perez-Cruz,  “Deep  models  under  the  gan:  information  leakage  from  collaborative  deep  learning,”  in  </span><span class='ptmri7t-x-x-80'>Proc.  of  ACM
+   CCS</span><span class='ptmr7t-x-x-80'>.    ACM, 2017, pp. 603–618.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+ <span class='ptmr7t-x-x-80'>[5] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xgoodfellow2014generative'></a><span class='ptmr7t-x-x-80'>I. Goodfellow, J. Pouget-Abadie, M. Mirza, B. Xu, D. Warde-Farley, S. Ozair, A. Courville, and Y. Bengio, “Generative adversarial nets,” in </span><span class='ptmri7t-x-x-80'>Proc.
+   of NIPS</span><span class='ptmr7t-x-x-80'>, 2014, pp. 2672–2680.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+ <span class='ptmr7t-x-x-80'>[6] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xmelis2018inference'></a><span class='ptmr7t-x-x-80'>L. Melis, C. Song, E. De Cristofaro, and V. Shmatikov, “Inference attacks against collaborative learning,” </span><span class='ptmri7t-x-x-80'>arXiv preprint arXiv:1805.04049</span><span class='ptmr7t-x-x-80'>, 2018.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+ <span class='ptmr7t-x-x-80'>[7] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xodena2016conditional'></a><span class='ptmr7t-x-x-80'>A. Odena, C. Olah, and J. Shlens, “Conditional image synthesis with auxiliary classifier gans,” </span><span class='ptmri7t-x-x-80'>arXiv preprint arXiv:1610.09585</span><span class='ptmr7t-x-x-80'>, 2016.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+ <span class='ptmr7t-x-x-80'>[8] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xkonevcny2016federated'></a><span class='ptmr7t-x-x-80'>J. Konečnỳ, H. B. McMahan, D. Ramage, and P. Richtárik, “Federated optimization: distributed machine learning for on-device intelligence,” </span><span class='ptmri7t-x-x-80'>arXiv
+   preprint arXiv:1610.02527</span><span class='ptmr7t-x-x-80'>, 2016.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+ <span class='ptmr7t-x-x-80'>[9] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xchen2016revisiting'></a><span class='ptmr7t-x-x-80'>J. Chen, R. Monga, S. Bengio, and R. Jozefowicz, “Revisiting distributed synchronous sgd,” </span><span class='ptmri7t-x-x-80'>arXiv preprint arXiv:1604.00981</span><span class='ptmr7t-x-x-80'>, 2016.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[10] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xpathak2010multiparty'></a><span class='ptmr7t-x-x-80'>M. Pathak, S. Rane, and B. Raj, “Multiparty differential privacy via aggregation of locally trained classifiers,” in </span><span class='ptmri7t-x-x-80'>Proc. of NIPS</span><span class='ptmr7t-x-x-80'>, 2010, pp. 1876–1884.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[11] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xhamm2016learning'></a><span class='ptmr7t-x-x-80'>J. Hamm, Y. Cao, and M. Belkin, “Learning privately from multiparty data,” in </span><span class='ptmri7t-x-x-80'>Proc. of ICML</span><span class='ptmr7t-x-x-80'>, 2016, pp. 555–563.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[12] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xdwork2014algorithmic'></a><span class='ptmr7t-x-x-80'>C. Dwork  and  A. Roth,  “The  algorithmic  foundations  of  differential  privacy,”  </span><span class='ptmri7t-x-x-80'>Foundations  and  Trends®  in  Theoretical  Computer  Science</span><span class='ptmr7t-x-x-80'>,  vol. 9,
+   no. 3–4, pp. 211–407, 2014.</span>
+                                                                                                  
+                                                                                                  
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[13] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xgeyer2017differentially'></a><span class='ptmr7t-x-x-80'>R. C. Geyer, T. Klein, and M. Nabi, “Differentially private federated learning: A client level perspective,” </span><span class='ptmri7t-x-x-80'>arXiv preprint arXiv:1712.07557</span><span class='ptmr7t-x-x-80'>, 2017.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[14] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xmohassel2017secureml'></a><span class='ptmr7t-x-x-80'>P. Mohassel and Y. Zhang, “Secureml: A system for scalable privacy-preserving machine learning.” </span><span class='ptmri7t-x-x-80'>IACR Cryptology ePrint Archive</span><span class='ptmr7t-x-x-80'>, vol. 2017, p.
+   396, 2017.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[15] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xdanner2015fully'></a><span class='ptmr7t-x-x-80'>G. Danner and M. Jelasity, “Fully distributed privacy preserving mini-batch gradient descent learning,” in </span><span class='ptmri7t-x-x-80'>Proc. of IFIP</span><span class='ptmr7t-x-x-80'>, 2015, pp. 30–44.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[16] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xbonawitz2017practical'></a><span class='ptmr7t-x-x-80'>K. Bonawitz, V. Ivanov, B. Kreuter, A. Marcedone, H. B. McMahan, S. Patel, D. Ramage, A. Segal, and K. Seth, “Practical secure aggregation
+   for privacy preserving machine learning.” </span><span class='ptmri7t-x-x-80'>IACR Cryptology ePrint Archive</span><span class='ptmr7t-x-x-80'>, vol. 2017, p. 281, 2017.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[17] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xshokri2017membership'></a><span class='ptmr7t-x-x-80'>R. Shokri, M. Stronati, C. Song, and V. Shmatikov, “Membership inference attacks against machine learning models,” in </span><span class='ptmri7t-x-x-80'>Proc. of IEEE SP</span><span class='ptmr7t-x-x-80'>, 2017,
+   pp. 3–18.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[18] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xhayes2017logan'></a><span class='ptmr7t-x-x-80'>J. Hayes,  L. Melis,  G. Danezis,  and  E. De Cristofaro,  “Logan:  evaluating  privacy  leakage  of  generative  models  using  generative  adversarial
+   networks,” </span><span class='ptmri7t-x-x-80'>arXiv preprint arXiv:1705.07663</span><span class='ptmr7t-x-x-80'>, 2017.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[19] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xfredrikson2015model'></a><span class='ptmr7t-x-x-80'>M. Fredrikson, S. Jha, and T. Ristenpart, “Model inversion attacks that exploit confidence information and basic countermeasures,” in </span><span class='ptmri7t-x-x-80'>Proc. of ACM
+   SIGSAC</span><span class='ptmr7t-x-x-80'>, 2015, pp. 1322–1333.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[20] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xcorrigan2013proactively'></a><span class='ptmr7t-x-x-80'>H. Corrigan-Gibbs, D. I. Wolinsky, and B. Ford, “Proactively accountable anonymous messaging in verdict.” in </span><span class='ptmri7t-x-x-80'>USENIX Security Symposium</span><span class='ptmr7t-x-x-80'>, 2013,
+   pp. 147–162.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[21] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xchen2016infogan'></a><span class='ptmr7t-x-x-80'>X. Chen,  Y. Duan,  R. Houthooft,  J. Schulman,  I. Sutskever,  and  P. Abbeel,  “Infogan:  Interpretable  representation  learning  by  information
+   maximizing generative adversarial nets,” in </span><span class='ptmri7t-x-x-80'>Proc. of NIPS</span><span class='ptmr7t-x-x-80'>, 2016, pp. 2172–2180.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[22] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xmahendran2015understanding'></a><span class='ptmr7t-x-x-80'>A. Mahendran and A. Vedaldi, “Understanding deep image representations by inverting them,” in </span><span class='ptmri7t-x-x-80'>Proc. of IEEE CVPR</span><span class='ptmr7t-x-x-80'>, 2015, pp. 5188–5196.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[23] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xszegedy2013intriguing'></a><span class='ptmr7t-x-x-80'>C. Szegedy, W. Zaremba, I. Sutskever, J. Bruna, D. Erhan, I. Goodfellow, and R. Fergus, “Intriguing properties of neural networks,” </span><span class='ptmri7t-x-x-80'>arXiv preprint
+   arXiv:1312.6199</span><span class='ptmr7t-x-x-80'>, 2013.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[24] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xsalimans2016improved'></a><span class='ptmr7t-x-x-80'>T. Salimans, I. Goodfellow, W. Zaremba, V. Cheung, A. Radford, and X. Chen, “Improved techniques for training gans,” in </span><span class='ptmri7t-x-x-80'>Proc. of NIPS</span><span class='ptmr7t-x-x-80'>, 2016,
+   pp. 2234–2242.</span>
+</p>
+   </div>
+  <div class='footnotes'>        <aside class='footnotetext' role='doc-footnote'>
+<!-- l. 51 --><p class='noindent'><a id='x1-3x'></a><span class='footnote-mark'><a href='#fn1x0-bk' id='fn1x0'><sup class='textsuperscript'>1</sup></a></span><span class='ptmr7t-x-x-80'>This manuscript has been accepted by IEEE INFOCOM 2019.</span></p></aside> 
+ <aside class='footnotetext' role='doc-footnote'>
+<!-- l. 84 --><p class='noindent'><a id='x1-7x2'></a><span class='footnote-mark'><a href='#fn2x0-bk' id='fn2x0'><sup class='textsuperscript'>2</sup></a></span><span class='ptmr7t-x-x-80'>In this paper, “user-level” and “client-level” are used interchangeably.</span></p></aside> 
+                                                                                                                                         </div>
+ 
+</body> 
+</html>

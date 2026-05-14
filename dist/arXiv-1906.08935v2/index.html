@@ -1,0 +1,728 @@
+<!DOCTYPE html> 
+<html lang='en-US' xml:lang='en-US'> 
+<head> <title>Deep Leakage from Gradients</title> 
+<meta charset='utf-8' /> 
+<meta content='TeX4ht (https://tug.org/tex4ht/)' name='generator' /> 
+<meta content='width=device-width,initial-scale=1' name='viewport' /> 
+<link href='main.css' rel='stylesheet' type='text/css' /> 
+<meta content='main.tex' name='src' /> 
+<script>window.MathJax = { tex: { tags: "ams", }, }; </script> 
+<script async='async' id='MathJax-script' src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js' type='text/javascript'></script>  
+</head><body>
+<div class='maketitle'>_______________________________________________________________________________________________________________________________________________________________
+
+<h1 class='titleHead'>Deep Leakage from Gradients</h1>________________________________________
+ <div class='author'> <span class='ptmb8t-'>Ligeng Zhu     Zhijian Liu     Song Han</span>
+<br />     Massachusetts Institute of Technology
+<br />   <span class='ectt-0900'>{ligeng, zhijian, songhan}@mit.edu </span></div>
+<br />
+                                                                                           
+                                                                                           
+       <figure class='float'>
+                                                                                           
+                                                                                           
+       <span class='ptmr8t-x-x-90'>33rd Conference on Neural Information Processing Systems (NeurIPS 2019), Vancouver, Canada.</span>
+                                                                                                                                                                                        
+                                                                                                                                                                                        
+       </figure>
+       </div>
+       <section class='abstract' role='doc-abstract'> 
+
+       <div class='centerline'>                                                                              <span class='ptmb8t-x-x-120'>Abstract</span>                                                           </div>
+              <blockquote class='quote'>
+              <!-- l. 3 --><p class='noindent'>Exchanging  gradients  is  a  widely  used  method  in  modern  multi-node  machine
+              learning system (<span class='ptmri8t-'>e.g</span>., distributed training, collaborative learning). For a long time,
+              people believed that gradients are safe to share: <span class='ptmri8t-'>i.e</span>., the training data will not be
+              leaked by gradients exchange. However, we show that it is possible to obtain the
+              private training data from the publicly shared gradients. We name this leakage
+              as  <span class='ptmri8t-'>Deep  Leakage  from  Gradient  </span>and  empirically  validate  the  effectiveness  on
+              both computer vision and natural language processing tasks. Experimental results
+              show that our attack is much stronger than previous approaches: the recovery is
+              <span class='ptmri8t-'>pixel-wise  </span>accurate  for  images  and  <span class='ptmri8t-'>token-wise  </span>matching  for  texts.  Thereby  we
+              want to raise people’s awareness to rethink the gradient’s safety. We also discuss
+              several  possible  strategies  to  prevent  such  deep  leakage.  Without  changes  on
+              training setting, the most effective defense method is gradient pruning.
+       </p>
+              </blockquote>
+       </section>
+       
+       <h3 class='sectionHead' id='introduction'><span class='titlemark'>1    </span>   <a id='x1-10001'></a>Introduction</h3>
+       <!-- l. 4 --><p class='noindent'>Distributed training becomes necessary to speedup training on large-scale datasets. In a distributed learning
+       system, the computation is executed parallely on each worker and synchronized via exchanging gradients
+       (both parameter server <span class='cite'> [<a href='#Xli2014scaling'>23</a>, <a href='#Xiandola2016firecaffe'>15</a>]</span> and all-reduce <span class='cite'> [<a href='#Xbarney2010introduction_to_parallel_computing'>3</a>, <a href='#Xpatarasuk2009ring_all_reduce'>30</a>]</span>). The distribution of computation naturally
+       leads to the splitting of data: Each client has its own the training data and only communicates
+       gradient during training (says the training set never leaves local machine). It allows to train a
+       model using data from multiple sources without centralizing them. This scheme is named as
+       collaborative learning and widely used when the training set contains private information <span class='cite'> [<a href='#Xjochems2016distributed'>18</a>, <a href='#Xgoogle2016federated'>20</a>]</span>.
+       For example, multiple hospitals train a model jointly without sharing their patients’ medical
+       data <span class='cite'> [<a href='#Xjochems2017developing'>17</a>, <a href='#Xmcmahan2016communication'>26</a>]</span>.
+       </p><!-- l. 11 --><p class='noindent'>Distributed training and collaborative learning have been widely used in large scale machine learning
+       tasks. However, <span class='ptmb8t-'>does the “gradient sharing” scheme protect the privacy of the training
+       datasets of each participant? </span>In most scenarios, people assume that gradients are safe to share
+       and will not expose the training data. Some recent studies show that gradients reveal some
+       properties of the training data, for example, property classifier <span class='cite'> [<a href='#XMelis2018unintended'>27</a>]</span> (whether a sample with certain
+       property is in the batch) and using generative adversarial networks to generate pictures that look
+       similar to the training images <span class='cite'> [<a href='#Xhitaj2017information'>13</a>, <a href='#XMelis2018unintended'>27</a>, <a href='#Xfredrikson2015model_inversion'>9</a>]</span>. Here we consider a more challenging case: can we
+       <span class='ptmb8t-'>completely </span>steal the training data from gradients? Formally, given a machine learning model <span class='mathjax-inline'>\(F()\)</span> and its
+       weights <span class='mathjax-inline'>\(W\)</span>, if we have the gradients <span class='mathjax-inline'>\(\nabla w\)</span> w.r.t a pair of input and label, can we obtain the training data
+       reversely? Conventional wisdom suggests that the answer is no, but we show that this is actually
+       possible.
+       </p><!-- l. 18 --><p class='noindent'>In this work, we demonstrate <span class='ptmri8t-'>Deep Leakage from Gradients </span>(<span class='ptmb8t-'>DLG</span>): sharing the gradients can leak private
+       training data. We present an optimization algorithm that can obtain both the training inputs and the labels in
+       just few iterations. To perform the attack, we first randomly generate a pair of “dummy” inputs and labels
+       and then perform the usual forward and backward. After deriving the dummy gradients from the dummy
+       data, instead of optimizing model weights as in typical training, we optimize the dummy inputs and
+       labels to minimize the distance between dummy gradients and real gradients (illustrated in
+       Fig. <a href='#the-overview-of-our-dlg-algorithm-variables-to-be-updated-are-marked-with-a-bold-border-while-normal-participants-calculate-w-to-update-parameter-using-its-private-training-data-the-malicious-attacker-updates-its-dummy-inputs-and-labels-to-minimize-the-gradients-distance-when-the-optimization-finishes-the-evil-user-is-able-to-obtain-the-training-set-from-honest-participants-'>2<!-- tex4ht:ref: fig:methods  --></a>). Matching the gradients makes the dummy data close to the original ones (Fig. <a href='#layeri-means-mse-between-real-and-dummy-gradients-of-ith-layer-when-the-gradients-distance-gets-smaller-the-mse-between-leaked-image-and-the-original-image-also-gets-smaller-'>5<!-- tex4ht:ref: fig:vision_fig3  --></a>).
+                                                                                                                                                                      
+                                                                                                                                                                      
+       When the optimization finishes, the private training data (both inputs and labels) will be fully
+       revealed.
+       </p><!-- l. 31 --><p class='noindent'>Conventional “shallow” leakages (property inference <span class='cite'> [<a href='#Xshokri2017membership'>34</a>, <a href='#XMelis2018unintended'>27</a>]</span> and generative model <span class='cite'> [<a href='#Xhitaj2017information'>13</a>]</span> using class
+       labels) requires extra label information and can only generate similar synthetic images. Our “deep” leakage
+       is an optimization process and does not depend on any generative models; therefore, DLG does not require
+       any other extra prior about the training set, instead, it can infer the label from shared gradients and the
+       results produced by DLG (both images and texts) are the exact original training samples instead of synthetic
+       look-alike alternatives. We evaluate the effectiveness of our algorithm on both vision (image
+       classification) and language tasks (masked language model). On various datasets and tasks,
+       DLG fully recovers the training data in just a few gradient steps. Such a deep leakage from
+       gradients is first discovered and we want to raise people’s awareness of rethinking the safety of
+       gradients.
+       </p><!-- l. 39 --><p class='noindent'>The deep leakage puts a severe challenge to the multi-node machine learning system. The fundamental
+       gradient sharing scheme, as shown in our work, is not always reliable to protect the privacy of the training
+       data. In centralized distributed training (Fig. <a href='#x1-1001r1'>1a<!-- tex4ht:ref: fig:overview:left  --></a>), the parameter server, which usually does not store any
+       training data, is able to steal local training data of all participants. For decentralized distributed training
+       (Fig. <a href='#x1-1002r2'>1b<!-- tex4ht:ref: fig:overview:right  --></a>), it becomes even worse since any participant can steal its neighbors’ private training data. To
+       prevent the deep leakage, we demonstrate three defense strategies: gradient perturbation, low precision,
+       and gradient compression. For gradient perturbation, we find both Gaussian and Laplacian
+       noise with a scale higher than <span class='mathjax-inline'>\(10^{-2}\)</span> would be a good defense. While half precision fails to protect,
+       gradient compression successfully defends the attack with the pruned gradient is more than
+       20%.
+       </p>
+       <figure class='figure' id='x1-1003r1'><span id='the-deep-leakage-scenarios-in-two-categories-of-classical-multinode-training-the-little-red-demon-appears-in-the-location-where-the-deep-leakage-might-happen-when-performing-centralized-training-the-parameter-server-is-capable-to-steal-all-training-data-from-gradients-received-from-worker-nodes-while-training-in-a-decentralized-manner-eg-ring-all-reduce-patarasuk2009ringallreduce-any-participant-can-be-malicious-and-steal-the-training-data-from-its-neighbors'></span> 
+
+                                                                                                                                                                      
+                                                                                                                                                                      
+                                                                                                                                                                      
+                                                                                                                                                                      
+       <div class='subfigure'>
+       <!-- l. 49 --><p class='noindent'></p><!-- l. 51 --><p class='noindent'> <img alt='PIC' height='210' src='figures/fig1_left-crop-.png' width='210' /> <a id='x1-1001r1'></a></p>
+<div class='caption'><span class='id'><span class='ptmr8t-x-x-90'>(a) </span></span><span class='content'><span class='ptmr8t-x-x-90'>Distributed training with a centralized server</span>                 </span></div></div> <div class='subfigure'>
+       <!-- l. 55 --><p class='noindent'></p><!-- l. 57 --><p class='noindent'> <img alt='PIC' height='182' src='figures/fig1_right-crop-.png' width='182' /> <a id='x1-1002r2'></a></p>
+<div class='caption'><span class='id'><span class='ptmr8t-x-x-90'>(b) </span></span><span class='content'><span class='ptmr8t-x-x-90'>Distributed training without a centralized server</span></span></div></div> 
+       <div class='caption'><span class='id'>Figure 1: </span><span class='content'>The deep leakage scenarios in two categories of classical multi-node training. The little red
+demon appears in the location where the deep leakage might happen. When performing centralized
+training, the parameter server is capable to steal all training data from gradients received from worker
+nodes. While training in a decentralized manner (e.g., ring all reduce <span class='cite'> [<a href='#Xpatarasuk2009ring_all_reduce'>30</a>]</span>), any participant can be
+malicious and steal the training data from its neighbors.
+       </span></div>
+                                                                                                                                                                      
+                                                                                                                                                                      
+       </figure>
+       <!-- l. 65 --><p class='noindent'>Our contributions include:
+       </p>
+              <ul class='itemize1'>
+              <li class='itemize'>We demonstrate that it is possible to obtain the private training data from the publicly shared
+              gradients. To our best knowledge, DLG is the first algorithm achieving it.
+              </li>
+              <li class='itemize'>DLG only requires the gradients and can reveal pixel-wise accurate images and token-wise
+              matching texts. While conventional approaches usually need extra information to attack
+              and only produce partial properties or synthetic alternatives.
+              </li>
+              <li class='itemize'>To prevent potential leakage of important data, we analyze the attack difficulties in various
+              settings and discuss several defense strategies against the attack.</li></ul>
+       
+       <h3 class='sectionHead' id='related-work'><span class='titlemark'>2    </span>   <a id='x1-20002'></a>Related Work</h3>
+       
+       <h4 class='subsectionHead' id='distributed-training'><span class='titlemark'>2.1    </span>   <a id='x1-30002.1'></a>Distributed Training</h4>
+       <!-- l. 4 --><p class='noindent'>Training large machine learning models (e.g., deep neural networks) is computationally intensive. In order
+       to finish the training process in a reasonable time, many studies worked on distributed training to speedup.
+       There are many works that aim to improve the scalability of distributed training, both at the
+       algorithm level <span class='cite'> [<a href='#Xli2014scaling'>23</a>, <a href='#Xdean2012large'>7</a>, <a href='#Xrecht2011hogwild'>32</a>, <a href='#Xgoyal2017accurate'>11</a>, <a href='#Xjia2018highly'>16</a>]</span> and at the framework level <span class='cite'> [<a href='#Xchen2015mxnet'>6</a>, <a href='#Xchainermn_mlsys2017'>2</a>, <a href='#Xtensorflow2015-whitepaper'>1</a>, <a href='#Xpaszke2017pytorch'>29</a>, <a href='#Xsergeev2018horovod'>33</a>]</span>. Most of
+       them adapt synchronous SGD as the backbone because the stable performance while scaling
+       up.
+       </p><!-- l. 11 --><p class='noindent'>In general, distributed training can be classified into two categories: with a parameter server
+       (centralized) <span class='cite'> [<a href='#Xli2014scaling'>23</a>, <a href='#Xiandola2016firecaffe'>15</a>, <a href='#Xkim2016deepspark'>19</a>]</span> and without a parameter server (decentralized) <span class='cite'> [<a href='#Xbarney2010introduction_to_parallel_computing'>3</a>, <a href='#Xpatarasuk2009ring_all_reduce'>30</a>, <a href='#Xsergeev2018horovod'>33</a>]</span>). In both
+       schemes, each node first performs the computation to update its local weights, and then sends
+       gradients to other nodes. For the centralized mode, the gradients first get aggregated and then
+       delivered back to each node. For decentralized mode, gradients are exchanged between neighboring
+       nodes.
+       </p><!-- l. 18 --><p class='noindent'>In many application scenarios, the training data is privacy-sensitive. For example, a patient’s medical
+       condition can not be shared across hospitals. To avoid the sensitive information being leaked, collaborative
+       learning has recently emerged <span class='cite'> [<a href='#Xjochems2017developing'>17</a>, <a href='#Xjochems2016distributed'>18</a>, <a href='#Xmcmahan2016communication'>26</a>]</span> where two or more participants can jointly train a model
+       while the training dataset never leave each participants’ local server. Only the gradients are shared across
+       the network. This technique has been used to train models for medical treatments across multiple
+       hospitals <span class='cite'> [<a href='#Xjochems2016distributed'>18</a>]</span>, analyze patient survival situations from various countries <span class='cite'> [<a href='#Xjochems2017developing'>17</a>]</span> and build predictive
+       keyboards to improve typing experience <span class='cite'> [<a href='#Xmcmahan2016communication'>26</a>, <a href='#Xgoogle2016federated'>20</a>, <a href='#Xbonawitz2019towards'>4</a>]</span>.
+       
+       </p>
+       <h4 class='subsectionHead' id='shallow-leakage-from-gradients'><span class='titlemark'>2.2    </span>   <a id='x1-40002.2'></a>“Shallow” Leakage from Gradients</h4>
+       <!-- l. 25 --><p class='noindent'>Previous works have made some explorations on how to infer the information of training data from
+       gradients. For some layers, the gradients already leak certain level of information. For example, the
+                                                                                                                                                                      
+                                                                                                                                                                      
+       embedding layer in language tasks only produces gradients for words occurred in training data, which
+       reveals what words have been used in other participant’s training set <span class='cite'> [<a href='#XMelis2018unintended'>27</a>]</span>. But such leakage is “shallow”:
+       The leaked words is unordered and and it is hard to infer the original sentence due to ambiguity. Another
+       case is fully connected layers, where observations of gradient updates can be used to infer output feature
+       values. However, this cannot extend to convolutional layers because the size of the features is far larger than
+       the size of weights.
+       </p><!-- l. 31 --><p class='noindent'>Some recent works develop learning-based methods to infer properties of the batch. They show that a binary
+       classifier trained on gradients is able to determine whether an exact data record (membership
+       inference <span class='cite'> [<a href='#Xshokri2017membership'>34</a>, <a href='#XMelis2018unintended'>27</a>]</span>) or a data record with certain properties (property inference <span class='cite'> [<a href='#XMelis2018unintended'>27</a>]</span>) is included in the
+       other participant’s’ batch. Furthermore, they train GAN models <span class='cite'> [<a href='#Xgoodfellow2014generative'>10</a>]</span> to synthesis images look similar to
+       training data from the gradient  <span class='cite'> [<a href='#Xhitaj2017information'>13</a>, <a href='#XMelis2018unintended'>27</a>, <a href='#Xfredrikson2015model_inversion'>9</a>]</span>, but the attack is limited and only works when all class
+       members look alike (e.g., face recognition).
+       
+       </p>
+       <h3 class='sectionHead' id='method'><span class='titlemark'>3    </span>   <a id='x1-50003'></a>Method</h3>
+       <figure class='figure'> 
+
+                                                                                                                                                                      
+                                                                                                                                                                      
+                                                                                                                                                                      
+                                                                                                                                                                      
+       <!-- l. 13 --><p class='noindent' id='the-overview-of-our-dlg-algorithm-variables-to-be-updated-are-marked-with-a-bold-border-while-normal-participants-calculate-w-to-update-parameter-using-its-private-training-data-the-malicious-attacker-updates-its-dummy-inputs-and-labels-to-minimize-the-gradients-distance-when-the-optimization-finishes-the-evil-user-is-able-to-obtain-the-training-set-from-honest-participants-'> <img alt='PIC' height='397' src='figures/fig2-crop-.png' width='397' /> <a id='x1-5001r2'></a>
+       </p>
+       <figcaption class='caption'><span class='id'>Figure 2: </span><span class='content'>The overview of our DLG algorithm. Variables to be updated are marked with a bold
+border. While normal participants calculate <span class='mathjax-inline'>\(\nabla W\)</span> to update parameter using its private training data, the
+malicious attacker updates its dummy inputs and labels to minimize the gradients distance. When
+the optimization finishes, the evil user is able to obtain the training set from honest participants.      </span></figcaption><!-- tex4ht:label?: x1-5001r2  -->
+                                                                                                                                                                      
+                                                                                                                                                                      
+       </figure>
+       <!-- l. 21 --><p class='noindent'>We show that it’s possible to steal an image pixel-wise and steal a sentence token-wise from the gradients.
+       We focus on the standard synchronous distributed training: At each step <span class='mathjax-inline'>\(t\)</span>, every node <span class='mathjax-inline'>\(i\)</span> samples a minibatch <span class='mathjax-inline'>\((\mathbf {x}_{t, i}, \mathbf {y}_{t, i}) \)</span>
+       from its own dataset to compute the gradients
+</p>
+<div class='mathjax-env mathjax-equation'>\begin{equation} \nabla W_{t, i} = \frac { \partial \ell (F(\mathbf {x}_{t, i}, W_{t}), \mathbf {y}_{t, i} ) }{ \partial W_t } \end{equation}</div>
+<p><a id='x1-5002r1'></a>
+<!-- l. 36 --></p><p class='noindent'>The gradients are averaged across the <span class='mathjax-inline'>\(N\)</span> servers and then used to update the weights: </p><div class='mathjax-env mathjax-equation'>\begin{equation} \begin {split} \nabla W_{t} = \frac {1}{N} \sum _{j}^{N} \nabla W_{t, j}; \quad W_{t+1} = W_{t} - \eta \nabla W_{t} \end {split} \end{equation}</div>
+<p><a id='x1-5003r2'></a>
+<!-- l. 47 --></p><p class='noindent'>Given gradients <span class='mathjax-inline'>\(\nabla W_{t, k}\)</span> received from other participant <span class='mathjax-inline'>\(k\)</span>, we aim to steal participant <span class='mathjax-inline'>\(k\)</span>’s training data <span class='mathjax-inline'>\((\mathbf {x}_{t, k}, \mathbf {y}_{t, k})\)</span>. Note <span class='mathjax-inline'>\(F()\)</span> and <span class='mathjax-inline'>\(W_{t}\)</span> are
+shared by default for synchronized distributed optimization.
+
+</p>
+<h4 class='subsectionHead' id='training-data-leakage-through-gradients-matching'><span class='titlemark'>3.1    </span>   <a id='x1-60003.1'></a>Training Data Leakage through Gradients Matching</h4>
+<div class='algorithm'>
+                                                                                                                                                                      
+                                                                                                                                                                      
+       <!-- l. 1 --><p class='noindent'></p><figure class='float' id='x1-6001r1'><span id='deep-leakage-from-gradients'></span>
+                                                                                                                                                                      
+                                                                                                                                                                      
+       
+       <figcaption class='caption'><span class='id'><span class='ptmb8t-'>Algorithm 1 </span></span><span class='content'>Deep Leakage from Gradients.
+       </span></figcaption><!-- tex4ht:label?: x1-6001r1  -->
+               <span class='ptmb8t-'>Input: </span><span class='mathjax-inline'>\(F(\mathbf {x};W)\)</span>: Differentiable machine learning model; <span class='mathjax-inline'>\(W\)</span>: parameter weights; <span class='mathjax-inline'>\(\nabla W\)</span>: gradients calculated by training
+       data <br class='newline' />        <span class='ptmb8t-'>Output: </span>private training data <span class='mathjax-inline'>\(\mathbf {x}, \mathbf {y}\)</span> <div class='algorithmic'>
+              <span class='line'><span class='label label-11.99997pt'>
+        <span class='ptmr8t-x-x-90'>1:</span> </span> <span class='algorithmic'> <span class='ptmb8t-'>procedure</span> <span class='ptmrc8t-'>DLG</span>(<span class='mathjax-inline'>\(F\)</span>, <span class='mathjax-inline'>\(W\)</span>, <span class='mathjax-inline'>\(\nabla W\)</span>)               </span></span><br class='algorithmic' /><span class='line'><span class='label label-11.99997pt'>         <span class='ptmr8t-x-x-90'>2:</span> </span> <span class='algorithmic'>       <span class='mathjax-inline'>\(\mathbf {x'}_{1} \gets \mathcal {N}(0, 1)\)</span> , <span class='mathjax-inline'>\(\mathbf {y'}_{1} \gets \mathcal {N}(0, 1)\)                                                                                               \(\triangleright \)</span> Initialize dummy inputs and           labels.               </span></span><br class='algorithmic' /><span class='line'><span class='label label-11.99997pt'>         <span class='ptmr8t-x-x-90'>3:</span> </span> <span class='algorithmic'>       <span class='ptmb8t-'>for</span> <span class='mathjax-inline'>\(i \gets 1 \textrm { to } n\)</span> <span class='ptmb8t-'>do</span>               </span></span><br class='algorithmic' /><span class='line'><span class='label label-11.99997pt'>         <span class='ptmr8t-x-x-90'>4:</span> </span> <span class='algorithmic'>             <span class='mathjax-inline'>\( \nabla W'_i \gets \partial \ell (F(\mathbf {x'}_i, W_{t}), \mathbf {y'}_i) / \partial W_t \)                                                                                                             \(\triangleright \)</span> Compute dummy           gradients.               </span></span><br class='algorithmic' /><span class='line'><span class='label label-11.99997pt'>         <span class='ptmr8t-x-x-90'>5:</span> </span> <span class='algorithmic'>             <span class='mathjax-inline'>\( \mathbb {D}_i \gets ||\nabla W'_i - \nabla W||^2 \)</span>               </span></span><br class='algorithmic' /><span class='line'><span class='label label-11.99997pt'>         <span class='ptmr8t-x-x-90'>6:</span> </span> <span class='algorithmic'>             <span class='mathjax-inline'>\(\mathbf {x}'_{i+1} \gets \mathbf {x}'_i - \eta \nabla _{\mathbf {x}'_i} \mathbb {D}_i\)</span> , <span class='mathjax-inline'>\(\mathbf {y}'_{i+1} \gets \mathbf {y}'_i - \eta \nabla _{\mathbf {y}'_i} \mathbb {D}_i\)                                                                                                    \(\triangleright \)</span> Update data to match           gradients.               </span></span><br class='algorithmic' /><span class='line'><span class='label label-11.99997pt'>         <span class='ptmr8t-x-x-90'>7:</span> </span> <span class='algorithmic'>       <span class='ptmb8t-'>end</span> <span class='ptmb8t-'>for</span>               </span></span><br class='algorithmic' /><span class='line'><span class='label label-11.99997pt'>         <span class='ptmr8t-x-x-90'>8:</span> </span> <span class='algorithmic'>       <span class='ptmb8t-'>return </span><span class='mathjax-inline'>\(\mathbf {x}'_{n+1}, \mathbf {y}'_{n+1}\)</span>               </span></span><br class='algorithmic' /><span class='line'><span class='label label-11.99997pt'>         <span class='ptmr8t-x-x-90'>9:</span> </span> <span class='algorithmic'> <span class='ptmb8t-'>end</span> <span class='ptmb8t-'>procedure</span></span></span>
+       </div>
+                                                                                                                                                                      
+                                                                                                                                                                      
+       </figure>
+       </div>
+       <!-- l. 54 --><p class='noindent'>To recover the data from gradients, we first randomly initialize a dummy input <span class='mathjax-inline'>\(\mathbf {x'}\)</span> and label input <span class='mathjax-inline'>\(\mathbf {y'}\)</span>. We then
+       feed these “dummy data” into models and get “dummy gradients”.
+</p>
+<div class='mathjax-env mathjax-equation'>\begin{equation} \nabla W' = \frac { \partial \ell (F(\mathbf {x}', W), \mathbf {y}' ) }{ \partial W } \end{equation}</div>
+<p><a id='x1-6002r3'></a>
+<!-- l. 65 --></p><p class='noindent'>Optimizing the dummy gradients close as to original also makes the dummy data close to the real training
+data (the trends shown in Fig. <a href='#layeri-means-mse-between-real-and-dummy-gradients-of-ith-layer-when-the-gradients-distance-gets-smaller-the-mse-between-leaked-image-and-the-original-image-also-gets-smaller-'>5<!-- tex4ht:ref: fig:vision_fig3  --></a>). Given gradients at a certain step, we obtain the training data by
+minimizing the following objective </p><div class='mathjax-env mathjax-align'>\begin{align} \begin {split} \mathbf {x'}^{*}, \mathbf {y'}^{*} = \argmin _{\mathbf {x'}, \mathbf {y}'} ||\nabla W' - \nabla W||^2 = \argmin _{\mathbf {x'}, \mathbf {y}'} || \frac {\partial \ell (F(\mathbf {x}', W), \mathbf {y}')}{\partial W} - \nabla W ||^2 \end {split} \end{align}</div>
+<p><a id='x1-6003r4'></a>
+<!-- l. 78 --></p><p class='noindent'>The distance <span class='mathjax-inline'>\(||\nabla W' - \nabla W||^2\)</span> is differentiable w.r.t dummy inputs <span class='mathjax-inline'>\(\mathbf {x'}\)</span> and labels <span class='mathjax-inline'>\(\mathbf {y'}\)</span> can thus can be optimized using standard
+gradient-based methods. Note that this optimization requires <span class='mathjax-inline'>\(2^{nd}\)</span> order derivatives. We make a mild assumption
+that <span class='mathjax-inline'>\(F\)</span> is twice differentiable, which holds for the majority of modern machine learning models (e.g., most
+neural networks) and tasks.
+
+</p>
+<h4 class='subsectionHead' id='deep-leakage-for-batched-data'><span class='titlemark'>3.2    </span>   <a id='x1-70003.2'></a>Deep Leakage for Batched Data</h4>
+<figure class='figure' id='x1-7001r3'><span id='the-visualization-showing-the-deep-leakage-on-images-from-mnist-lecun1998mnist-cifar100-krizhevsky2009cifar-svhn-netzer2011svhn-and-lfw-lfwtech-respectively-our-algorithm-fully-recovers-the-four-images-while-previous-work-only-succeeds-on-simple-images-with-clean-backgrounds-'></span> 
+
+                                                                                                                                                                      
+                                                                                                                                                                      
+                                                                                                                                                                      
+                                                                                                                                                                      
+       <div class='tabular'> <table class='tabular' id='TBL-2'><colgroup id='TBL-2-1g'><col id='TBL-2-1' /><col id='TBL-2-2' /><col id='TBL-2-3' /><col id='TBL-2-4' /><col id='TBL-2-5' /></colgroup><colgroup id='TBL-2-6g'><col id='TBL-2-6' /></colgroup><colgroup id='TBL-2-7g'><col id='TBL-2-7' /></colgroup><tr id='TBL-2-1-'><td class='td11' id='TBL-2-1-1' style='white-space:normal; text-align:center;'> Iters=0  </td><td class='td11' id='TBL-2-1-2' style='white-space:normal; text-align:center;'> Iters=10  </td><td class='td11' id='TBL-2-1-3' style='white-space:normal; text-align:center;'> Iters=50  </td><td class='td11' id='TBL-2-1-4' style='white-space:normal; text-align:center;'> Iters=100  </td><td class='td11' id='TBL-2-1-5' style='white-space:normal; text-align:center;'> Iters=500  </td><td class='td11' id='TBL-2-1-6' style='white-space:normal; text-align:center;'> Melis <span class='cite'> [<a href='#XMelis2018unintended'>27</a>]</span>  </td><td class='td11' id='TBL-2-1-7' style='white-space:normal; text-align:center;'> Ground Truth  </td>
+</tr><tr id='TBL-2-2-'><td class='td11' id='TBL-2-2-1' style='white-space:normal; text-align:center;'>   <img alt='PIC' height='27' src='experiments/mnist_0_ours/0000.png' width='27' />     </td><td class='td11' id='TBL-2-2-2' style='white-space:normal; text-align:center;'>   <img alt='PIC' height='27' src='experiments/mnist_0_ours/0020.png' width='27' />      </td><td class='td11' id='TBL-2-2-3' style='white-space:normal; text-align:center;'>   <img alt='PIC' height='27' src='experiments/mnist_0_ours/0050.png' width='27' />      </td><td class='td11' id='TBL-2-2-4' style='white-space:normal; text-align:center;'>   <img alt='PIC' height='27' src='experiments/mnist_0_ours/0100.png' width='27' />       </td><td class='td11' id='TBL-2-2-5' style='white-space:normal; text-align:center;'>   <img alt='PIC' height='27' src='experiments/mnist_0_ours/0500.png' width='27' />       </td><td class='td11' id='TBL-2-2-6' style='white-space:normal; text-align:center;'>    <img alt='PIC' height='27' src='experiments/mnist_0_others/unintended.png' width='27' />         </td><td class='td11' id='TBL-2-2-7' style='white-space:normal; text-align:center;'>     <img alt='PIC' height='27' src='experiments/mnist_0_ours/ground_truth.png' width='27' />          </td></tr><tr id='TBL-2-3-'><td class='td11' id='TBL-2-3-1' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/cifar100_25_ours/0000.png' width='27' /> </td> <td class='td11' id='TBL-2-3-2' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/cifar100_25_ours/0020.png' width='27' /> </td> <td class='td11' id='TBL-2-3-3' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/cifar100_25_ours/0050.png' width='27' /> </td> <td class='td11' id='TBL-2-3-4' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/cifar100_25_ours/0100.png' width='27' /> </td> <td class='td11' id='TBL-2-3-5' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/cifar100_25_ours/0500.png' width='27' /> </td> <td class='td11' id='TBL-2-3-6' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/cifar100_25_others/unintended.png' width='27' /> </td> <td class='td11' id='TBL-2-3-7' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/cifar100_25_ours/ground_truth.png' width='27' /></td>
+</tr><tr id='TBL-2-4-'><td class='td11' id='TBL-2-4-1' style='white-space:normal; text-align:center;'>   <img alt='PIC' height='27' src='experiments/svhn_1_ours/0000.png' width='27' />     </td><td class='td11' id='TBL-2-4-2' style='white-space:normal; text-align:center;'>   <img alt='PIC' height='27' src='experiments/svhn_1_ours/0020.png' width='27' />      </td><td class='td11' id='TBL-2-4-3' style='white-space:normal; text-align:center;'>   <img alt='PIC' height='27' src='experiments/svhn_1_ours/0050.png' width='27' />      </td><td class='td11' id='TBL-2-4-4' style='white-space:normal; text-align:center;'>   <img alt='PIC' height='27' src='experiments/svhn_1_ours/0100.png' width='27' />       </td><td class='td11' id='TBL-2-4-5' style='white-space:normal; text-align:center;'>   <img alt='PIC' height='27' src='experiments/svhn_1_ours/0500.png' width='27' />       </td><td class='td11' id='TBL-2-4-6' style='white-space:normal; text-align:center;'>    <img alt='PIC' height='27' src='experiments/svhn_1_others/unintended.png' width='27' />         </td><td class='td11' id='TBL-2-4-7' style='white-space:normal; text-align:center;'>     <img alt='PIC' height='27' src='experiments/svhn_1_ours/ground_truth.png' width='27' />          </td></tr><tr id='TBL-2-5-'><td class='td11' id='TBL-2-5-1' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/lfw_51_ours/0000.png' width='27' /> </td> <td class='td11' id='TBL-2-5-2' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/lfw_51_ours/0020.png' width='27' /> </td> <td class='td11' id='TBL-2-5-3' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/lfw_51_ours/0050.png' width='27' /> </td> <td class='td11' id='TBL-2-5-4' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/lfw_51_ours/0100.png' width='27' /> </td> <td class='td11' id='TBL-2-5-5' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/lfw_51_ours/0500.png' width='27' /> </td> <td class='td11' id='TBL-2-5-6' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/lfw_51_others/unintended.png' width='27' /> </td> <td class='td11' id='TBL-2-5-7' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/lfw_51_ours/ground_truth.png' width='27' /></td>
+</tr></table>                                                                         </div>
+       
+       <figcaption class='caption'><span class='id'>Figure 3: </span><span class='content'>The visualization showing the deep leakage on images from MNIST <span class='cite'> [<a href='#Xlecun1998mnist'>22</a>]</span>, CIFAR-100 <span class='cite'>
+ [<a href='#Xkrizhevsky2009cifar'>21</a>]</span>,  SVHN <span class='cite'> [<a href='#Xnetzer2011svhn'>28</a>]</span>  and  LFW <span class='cite'> [<a href='#XLFWTech'>14</a>]</span>  respectively.  Our  algorithm  fully  recovers  the  four  images
+while previous work only succeeds on simple images with clean backgrounds.
+       </span></figcaption><!-- tex4ht:label?: x1-7001r3  -->
+                                                                                                                                                                      
+                                                                                                                                                                      
+       </figure>
+       <!-- l. 88 --><p class='noindent'>The algo. <a href='#deep-leakage-from-gradients'>1<!-- tex4ht:ref: algorithm:deep_leakage  --></a> works well when there is only a single pair of input and label in the batch. However when we
+       naively apply it to the case where batch size <span class='mathjax-inline'>\(N \ge 1\)</span>, the algorithm would be too slow to converge. We think the
+       reason is that batched data can have <span class='mathjax-inline'>\(N!\)</span> different permutations and thus make optimizer hard to
+       choose gradient directions. To force the optimization closer to a solution, instead of updating the
+       whole batch, we update a single training sample instead. We modify the <span class='ptmri8t-'>line 6 </span>in algo. <a href='#deep-leakage-from-gradients'>1<!-- tex4ht:ref: algorithm:deep_leakage  --></a> to
+       :
+</p>
+<div class='mathjax-env mathjax-align'>\begin{align} \begin {split} \mathbf {x'}^{i \bmod N}_{t+1} &amp;\leftarrow \mathbf {x'}^{i \bmod N}_{t} - \nabla _{\mathbf {x'}^{i \bmod N}_{t+1}} \mathbb {D} \\ \mathbf {y'}^{i \bmod N}_{t+1} &amp;\leftarrow \mathbf {y'}^{i \bmod N}_{t} - \nabla _{\mathbf {y'}^{i \bmod N}_{t+1}} \mathbb {D} \end {split} \end{align}</div>
+<p><a id='x1-7002r5'></a>
+<!-- l. 102 --></p><p class='noindent'>Then we can observe fast and stable convergence. We list the iterations required for convergence for
+different batch sizes in Tab. <a href='#the-iterations-required-for-restore-batched-data-on-cifar-krizhevsky2009cifar-dataset-'>1<!-- tex4ht:ref: tab:batched_restore  --></a> and provide visualized results in Fig. <a href='#results-of-deep-leakage-of-batched-data-though-the-order-may-not-be-the-same-and-there-are-more-artifact-pixels-dlg-still-produces-images-very-close-to-the-original-ones'>4<!-- tex4ht:ref: fig:experiment_vision_multi_batch  --></a>. The larger the batch size is, the more
+iterations DLG requires to attack.
+</p>
+<div class='table'>
+                                                                                                                                                                      
+                                                                                                                                                                      
+       <!-- l. 104 --><p class='noindent'></p><figure class='float' id='x1-7003r1'><span id='the-iterations-required-for-restore-batched-data-on-cifar-krizhevsky2009cifar-dataset-'></span>
+                                                                                                                                                                      
+                                                                                                                                                                      
+       <div class='tabular'> <table class='tabular' id='TBL-3'><colgroup id='TBL-3-1g'><col id='TBL-3-1' /></colgroup><colgroup id='TBL-3-2g'><col id='TBL-3-2' /></colgroup><colgroup id='TBL-3-3g'><col id='TBL-3-3' /></colgroup><colgroup id='TBL-3-4g'><col id='TBL-3-4' /></colgroup><colgroup id='TBL-3-5g'><col id='TBL-3-5' /></colgroup><tr id='TBL-3-1-'><td class='td11' id='TBL-3-1-1' style='white-space:normal; text-align:center;'>          </td><td class='td11' id='TBL-3-1-2' style='white-space:normal; text-align:center;'> BS=1  </td><td class='td11' id='TBL-3-1-3' style='white-space:normal; text-align:center;'> BS=2  </td><td class='td11' id='TBL-3-1-4' style='white-space:normal; text-align:center;'> BS=4  </td><td class='td11' id='TBL-3-1-5' style='white-space:normal; text-align:center;'> BS=8  </td></tr><tr class='hline' style='border-top:1px solid #000'><td></td><td></td><td></td><td></td><td></td></tr><tr id='TBL-3-2-'><td class='td11' id='TBL-3-2-1' style='white-space:normal; text-align:center;'> ResNet-20 </td> <td class='td11' id='TBL-3-2-2' style='white-space:normal; text-align:center;'> 270 </td> <td class='td11' id='TBL-3-2-3' style='white-space:normal; text-align:center;'> 602 </td> <td class='td11' id='TBL-3-2-4' style='white-space:normal; text-align:center;'> 1173 </td> <td class='td11' id='TBL-3-2-5' style='white-space:normal; text-align:center;'> 2711</td></tr></table>                                                            </div>
+       
+       <figcaption class='caption'><span class='id'>Table 1: </span><span class='content'>The iterations required for restore batched data on CIFAR <span class='cite'> [<a href='#Xkrizhevsky2009cifar'>21</a>]</span> dataset.
+       </span></figcaption><!-- tex4ht:label?: x1-7003r1  -->
+                                                                                                                                                                      
+                                                                                                                                                                      
+       </figure>
+       </div>
+       <figure class='figure' id='x1-7004r4'><span id='results-of-deep-leakage-of-batched-data-though-the-order-may-not-be-the-same-and-there-are-more-artifact-pixels-dlg-still-produces-images-very-close-to-the-original-ones'></span> 
+
+                                                                                                                                                                      
+                                                                                                                                                                      
+                                                                                                                                                                      
+                                                                                                                                                                      
+       <div class='tabular'> <table class='tabular' id='TBL-4'><colgroup id='TBL-4-1g'><col id='TBL-4-1' /><col id='TBL-4-2' /><col id='TBL-4-3' /><col id='TBL-4-4' /><col id='TBL-4-5' /><col id='TBL-4-6' /><col id='TBL-4-7' /><col id='TBL-4-8' /><col id='TBL-4-9' /><col id='TBL-4-10' /></colgroup><tr id='TBL-4-1-'><td class='td11' id='TBL-4-1-1' style='white-space:normal; text-align:center;'>    <span class='ptmr8t-x-x-90'>Initial        </span></td><td class='td11' id='TBL-4-1-2' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/0-0.png' width='27' />   </td><td class='td11' id='TBL-4-1-3' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/1-0.png' width='27' />   </td><td class='td11' id='TBL-4-1-4' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/2-0.png' width='27' />   </td><td class='td11' id='TBL-4-1-5' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/3-0.png' width='27' />   </td><td class='td11' id='TBL-4-1-6' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/4-0.png' width='27' />   </td><td class='td11' id='TBL-4-1-7' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/5-0.png' width='27' />   </td><td class='td11' id='TBL-4-1-8' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/6-0.png' width='27' />   </td><td class='td11' id='TBL-4-1-9' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/7-0.png' width='27' />   </td></tr><tr id='TBL-4-2-'><td class='td11' id='TBL-4-2-1' style='white-space:normal; text-align:center;'> <span class='ptmr8t-x-x-90'>Middle Stage </span></td> <td class='td11' id='TBL-4-2-2' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/0-100.png' width='27' /> </td> <td class='td11' id='TBL-4-2-3' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/1-100.png' width='27' /> </td> <td class='td11' id='TBL-4-2-4' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/2-100.png' width='27' /> </td> <td class='td11' id='TBL-4-2-5' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/3-100.png' width='27' /> </td> <td class='td11' id='TBL-4-2-6' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/4-100.png' width='27' /> </td> <td class='td11' id='TBL-4-2-7' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/5-100.png' width='27' /> </td> <td class='td11' id='TBL-4-2-8' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/6-100.png' width='27' /> </td> <td class='td11' id='TBL-4-2-9' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/7-100.png' width='27' /></td>
+</tr><tr id='TBL-4-3-'><td class='td11' id='TBL-4-3-1' style='white-space:normal; text-align:center;'> <span class='ptmr8t-x-x-90'>Fully Leaked   </span></td><td class='td11' id='TBL-4-3-2' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/0-400.png' width='27' />   </td><td class='td11' id='TBL-4-3-3' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/1-400.png' width='27' />   </td><td class='td11' id='TBL-4-3-4' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/2-400.png' width='27' />   </td><td class='td11' id='TBL-4-3-5' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/3-400.png' width='27' />   </td><td class='td11' id='TBL-4-3-6' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/4-400.png' width='27' />   </td><td class='td11' id='TBL-4-3-7' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/5-400.png' width='27' />   </td><td class='td11' id='TBL-4-3-8' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/6-400.png' width='27' />   </td><td class='td11' id='TBL-4-3-9' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/7-400.png' width='27' />   </td>
+</tr><tr id='TBL-4-4-'><td class='td11' id='TBL-4-4-1' style='white-space:normal; text-align:center;'> <span class='ptmr8t-x-x-90'>Ground Truth   </span></td><td class='td11' id='TBL-4-4-2' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/0-ground-truth.png' width='27' />   </td><td class='td11' id='TBL-4-4-3' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/1-ground-truth.png' width='27' />   </td><td class='td11' id='TBL-4-4-4' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/2-ground-truth.png' width='27' />   </td><td class='td11' id='TBL-4-4-5' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/3-ground-truth.png' width='27' />   </td><td class='td11' id='TBL-4-4-6' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/4-ground-truth.png' width='27' />   </td><td class='td11' id='TBL-4-4-7' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/5-ground-truth.png' width='27' />   </td><td class='td11' id='TBL-4-4-8' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/6-ground-truth.png' width='27' />   </td><td class='td11' id='TBL-4-4-9' style='white-space:normal; text-align:center;'> <img alt='PIC' height='27' src='experiments/multi_batch/7-ground-truth.png' width='27' />   </td></tr></table>         </div>
+       
+       <figcaption class='caption'><span class='id'>Figure 4: </span><span class='content'>Results of deep leakage of batched data. Though the order may not be the same and there
+are more artifact pixels, DLG still produces images very close to the original ones.
+       </span></figcaption><!-- tex4ht:label?: x1-7004r4  -->
+                                                                                                                                                                      
+                                                                                                                                                                      
+       </figure>
+                                                                                                                                                                      
+                                                                                                                                                                      
+       
+       <h3 class='sectionHead' id='experiments'><span class='titlemark'>4    </span>   <a id='x1-80004'></a>Experiments</h3>
+       <div class='table'>
+                                                                                                                                                                      
+                                                                                                                                                                      
+       <!-- l. 1 --><p class='noindent'></p><figure class='float'>
+                                                                                                                                                                      
+                                                                                                                                                                      
+       <div class='tabular'>
+ <table class='tabular' id='TBL-5'><colgroup id='TBL-5-1g'><col id='TBL-5-1' /><col id='TBL-5-2' /></colgroup><tr id='TBL-5-1-'><td class='td11' id='TBL-5-1-1' style='white-space:normal; text-align:center;'> <div class='minipage' id='layeri-means-mse-between-real-and-dummy-gradients-of-ith-layer-when-the-gradients-distance-gets-smaller-the-mse-between-leaked-image-and-the-original-image-also-gets-smaller-'><img alt='PIC' height='198' src='figures/fig3-crop-.png' width='198' /> <a id='x1-8001r5'></a>
+<figcaption class='caption'><span class='id'>Figure 5:  </span><span class='content'>Layer-<span class='mathjax-inline'>\(i\)</span>  means  MSE  between  real  and
+dummy gradients of <span class='mathjax-inline'>\(i^{th}\)</span> layer. When the gradients’
+distance  gets  smaller,  the  MSE  between  leaked
+image and the original image also gets smaller.
+</span></figcaption><!-- tex4ht:label?: x1-8001r5  -->                                                                               </div>  </td><td class='td11' id='TBL-5-1-2' style='white-space:normal; text-align:center;'> <div class='minipage' id='compassion-of-the-mse-of-images-leaked-by-different-algorithms-and-the-ground-truth-our-method-consistently-outperforms-previous-approach-by-a-large-margin-'><img alt='PIC' height='178' src='figures/fig4_barchart-crop-.png' width='178' /> <a id='x1-8002r6'></a>
+<figcaption class='caption'><span class='id'>Figure 6:   </span><span class='content'>Compassion   of   the   MSE   of
+images  leaked  by  different  algorithms  and
+the  ground  truth.  Our  method  consistently
+outperforms  previous  approach  by  a  large
+margin.
+</span></figcaption><!-- tex4ht:label?: x1-8002r6  -->                                                                        </div>  </td></tr></table></div>
+                                                                                                                                                                      
+                                                                                                                                                                      
+       </figure>
+       </div>
+       
+       <!-- l. 9 --><p class='noindent'><span class='paragraphHead' id='setup'>  <a id='x1-9000'></a><span class='ptmb8t-'>Setup.</span></span>
+       Implementing algorithm. <a href='#deep-leakage-from-gradients'>1<!-- tex4ht:ref: algorithm:deep_leakage  --></a> requires to calculate the high order gradients and we choose PyTorch <span class='cite'> [<a href='#Xpaszke2017pytorch'>29</a>]</span> as
+       our experiment platform. We use L-BFGS <span class='cite'> [<a href='#Xliu1989lbfgs'>25</a>]</span> with learning rate 1, history size 100 and max iterations 20
+       and optimize for 1200 iterations and 100 iterations for image and text task respectively. We aim to match
+       gradients from all trainable parameters. Notably, DLG has no requirements on model’s convergence status,
+       in another word, <span class='ptmri8t-'>the attack can happen anytime during the training</span>. To be more general, all our experiments
+       are using <span class='ptmri8t-'>randomly initialized weights</span>. More task-specific details can be found in following
+       sub-sections.
+       
+       </p>
+       <h4 class='subsectionHead' id='deep-leakage-on-image-classification'><span class='titlemark'>4.1    </span>   <a id='x1-100004.1'></a>Deep Leakage on Image Classification</h4>
+       <!-- l. 18 --><p class='noindent'>Given an image containing objects, images classification aims to determine the class of the item. We
+       experiment our algorithm on modern CNN architectures ResNet-56 <span class='cite'> [<a href='#Xhe2016deep'>12</a>]</span> and pictures from
+       MNIST <span class='cite'> [<a href='#Xlecun1998mnist'>22</a>]</span>, CIFAR-100 <span class='cite'> [<a href='#Xkrizhevsky2009cifar'>21</a>]</span>, SVHN <span class='cite'> [<a href='#Xnetzer2011svhn'>28</a>]</span> and LFW <span class='cite'> [<a href='#XLFWTech'>14</a>]</span>. Two changes we have made to
+       the models are replacing activation ReLU to Sigmoid and removing strides, as our algorithm
+       requires the model to be twice-differentiable. For image labels, instead of directly optimizing
+       the discrete categorical values, we random initialize a vector with shape <span class='mathjax-inline'>\(N \times C\)</span> where <span class='mathjax-inline'>\(N\)</span> is the batch
+       size and <span class='mathjax-inline'>\(C\)</span> is the number of classes, and then take its softmax output as the one-hot label for
+       optimization.
+       </p><!-- l. 20 --><p class='noindent'>The leaking process is visualized in Fig. <a href='#the-visualization-showing-the-deep-leakage-on-images-from-mnist-lecun1998mnist-cifar100-krizhevsky2009cifar-svhn-netzer2011svhn-and-lfw-lfwtech-respectively-our-algorithm-fully-recovers-the-four-images-while-previous-work-only-succeeds-on-simple-images-with-clean-backgrounds-'>3<!-- tex4ht:ref: fig:experiment_vision  --></a>. We start with random Gaussian noise (first column) and try to
+       match the gradients produced by the dummy data and real ones. As shown in Fig <a href='#layeri-means-mse-between-real-and-dummy-gradients-of-ith-layer-when-the-gradients-distance-gets-smaller-the-mse-between-leaked-image-and-the-original-image-also-gets-smaller-'>5<!-- tex4ht:ref: fig:vision_fig3  --></a>, minimizing the
+       distance between gradients also reduces the gap between data. We observe that monochrome images with a
+       clean background (MNIST) are easiest to recover, while complex images like face take more iterations to
+       recover (Fig. <a href='#the-visualization-showing-the-deep-leakage-on-images-from-mnist-lecun1998mnist-cifar100-krizhevsky2009cifar-svhn-netzer2011svhn-and-lfw-lfwtech-respectively-our-algorithm-fully-recovers-the-four-images-while-previous-work-only-succeeds-on-simple-images-with-clean-backgrounds-'>3<!-- tex4ht:ref: fig:experiment_vision  --></a>). When the optimization finishes, the recover results are almost identical to ground truth
+       images, despite few negligible artifact pixels.
+       </p><!-- l. 22 --><p class='noindent'>We visually compare the results from other method <span class='cite'> [<a href='#XMelis2018unintended'>27</a>]</span> and ours in Fig. <a href='#the-visualization-showing-the-deep-leakage-on-images-from-mnist-lecun1998mnist-cifar100-krizhevsky2009cifar-svhn-netzer2011svhn-and-lfw-lfwtech-respectively-our-algorithm-fully-recovers-the-four-images-while-previous-work-only-succeeds-on-simple-images-with-clean-backgrounds-'>3<!-- tex4ht:ref: fig:experiment_vision  --></a>. The previous method uses
+       GAN models when the class label is given and only works well on MNIST. The result on SVHN, though is
+       still visually recognizable as digit “9”, this is no longer the original training image. The cases
+       are even worse on LFW and collapse on CIFAR. We also make a numerical comparison by
+       performing leaking and measuring the MSE on all dataset images in Fig. <a href='#compassion-of-the-mse-of-images-leaked-by-different-algorithms-and-the-ground-truth-our-method-consistently-outperforms-previous-approach-by-a-large-margin-'>6<!-- tex4ht:ref: fig:vision_fig_bar  --></a>. Images are normalized
+       to the range <span class='mathjax-inline'>\([0, 1]\)</span> and our algorithm appears much better results (ours <span class='mathjax-inline'>\(&lt; 0.03\)</span> v.s. previous <span class='mathjax-inline'>\(&gt; 0.2\)</span>) on all four
+       datasets.
+       
+       </p>
+       <h4 class='subsectionHead' id='deep-leakage-on-masked-language-model'><span class='titlemark'>4.2    </span>   <a id='x1-110004.2'></a>Deep Leakage on Masked Language Model</h4>
+       <div class='table'>
+                                                                                                                                                                      
+                                                                                                                                                                      
+       <!-- l. 1 --><p class='noindent'></p><figure class='float' id='x1-11001r2'><span id='the-progress-of-deep-leakage-on-language-tasks-'></span>
+                                                                                                                                                                      
+                                                                                                                                                                      
+       <div class='tabular'> <table class='tabular' id='TBL-6'><colgroup id='TBL-6-1g'><col id='TBL-6-1' /></colgroup><colgroup id='TBL-6-2g'><col id='TBL-6-2' /></colgroup><colgroup id='TBL-6-3g'><col id='TBL-6-3' /></colgroup><colgroup id='TBL-6-4g'><col id='TBL-6-4' /></colgroup><tr id='TBL-6-1-'><td class='td11' id='TBL-6-1-1' style='white-space:normal; text-align:left;'> <!-- l. 5 --><p class='noindent'>          </p></td><td class='td11' id='TBL-6-1-2' style='white-space:normal; text-align:left;'> <!-- l. 5 --><p class='noindent'><span class='ptmr8t-x-x-90'>Example 1</span>                              </p></td><td class='td11' id='TBL-6-1-3' style='white-space:normal; text-align:left;'> <!-- l. 5 --><p class='noindent'><span class='ptmr8t-x-x-90'>Example 2</span>                              </p></td><td class='td11' id='TBL-6-1-4' style='white-space:normal; text-align:left;'> <!-- l. 5 --><p class='noindent'><span class='ptmr8t-x-x-90'>Example 3</span>                              </p></td>
+</tr><tr class='hline' style='border-top:1px solid #000'><td></td><td></td><td></td><td></td></tr><tr id='TBL-6-2-'><td class='td11' id='TBL-6-2-1' style='white-space:normal; text-align:left;'> <!-- l. 6 --><p class='noindent'><span class='ptmr8t-x-x-90'>Initial
+   Sentence</span>       </p></td><td class='td11' id='TBL-6-2-2' style='white-space:normal; text-align:left;'> <!-- l. 7 --><p class='noindent'><span class='ptmr8t-x-x-90'>tilting fill given **less word
+   **itude        fine        **nton
+   overheard
+   living vegas **vac **vation
+   *f forte **dis cerambycidae
+   ellison  **don  yards  marne
+   **kali</span>                                     </p></td><td class='td11' id='TBL-6-2-3' style='white-space:normal; text-align:left;'> <!-- l. 8 --><p class='noindent'><span class='ptmr8t-x-x-90'>toni
+   **enting asbestos cutler km
+   nail  **oof  **dation  **ori
+   righteous **xie lucan **hot
+   **ery  at  **tle  ordered  pa
+   **eit smashing proto</span>             </p></td><td class='td11' id='TBL-6-2-4' style='white-space:normal; text-align:left;'> <!-- l. 9 --><p class='noindent'><span class='ptmr8t-x-x-90'>[MASK]                       **ry
+   toppled **wled major relief
+   dive displaced **lice [CLS]
+   us apps _ **face **bet</span>          </p></td>
+</tr><tr class='hline' style='border-top:1px solid #000'><td></td><td></td><td></td><td></td></tr><tr id='TBL-6-3-'><td class='td11' id='TBL-6-3-1' style='white-space:normal; text-align:left;'> <!-- l. 11 --><p class='noindent'><span class='ptmr8t-x-x-90'>Iters = 10</span>      </p></td><td class='td11' id='TBL-6-3-2' style='white-space:normal; text-align:left;'> <!-- l. 12 --><p class='noindent'><span class='ptmr8t-x-x-90'>tilting fill given **less full
+   solicitor  other  ligue  shrill
+   living vegas rider treatment
+   carry                         played
+   sculptures  lifelong  ellison
+   net yards marne **kali</span>          </p></td><td class='td11' id='TBL-6-3-3' style='white-space:normal; text-align:left;'> <!-- l. 13 --><p class='noindent'><span class='ptmr8t-x-x-90'>toni                        **enting
+   asbestos    cutter    km    nail
+   undefeated   **dation   hole
+   righteous **xie lucan **hot
+   **ery  at  **tle  ordered  pa
+   **eit smashing proto</span>             </p></td><td class='td11' id='TBL-6-3-4' style='white-space:normal; text-align:left;'> <!-- l. 14 --><p class='noindent'><span class='ptmr8t-x-x-90'>[MASK]     **ry     toppled
+   identified  major  relief  gin
+   dive  displaced  **lice  doll
+   us apps _ **face space</span>          </p></td>
+</tr><tr class='hline' style='border-top:1px solid #000'><td></td><td></td><td></td><td></td></tr><tr id='TBL-6-4-'><td class='td11' id='TBL-6-4-1' style='white-space:normal; text-align:left;'> <!-- l. 16 --><p class='noindent'><span class='ptmr8t-x-x-90'>Iters = 20</span>      </p></td><td class='td11' id='TBL-6-4-2' style='white-space:normal; text-align:left;'> <!-- l. 17 --><p class='noindent'><span class='ptmr8t-x-x-90'>registration
+   ,   volunteer   applications   ,
+   at student travel application
+   open the ; week of played ;
+   child care will be glare .</span>        </p></td><td class='td11' id='TBL-6-4-3' style='white-space:normal; text-align:left;'> <!-- l. 18 --><p class='noindent'><span class='ptmr8t-x-x-90'>we  welcome  proposals  for
+   tutor  **ials  on  either  core
+   machine   denver   softly   or
+   topics
+   of emerging importance for
+   machine learning .</span>                 </p></td><td class='td11' id='TBL-6-4-4' style='white-space:normal; text-align:left;'> <!-- l. 19 --><p class='noindent'><span class='ptmr8t-x-x-90'>one    **ry    toppled    hold
+   major  ritual  ’  dive  annual
+   conference days 1924 apps
+   novelist dude space</span>                </p></td>
+</tr><tr class='hline' style='border-top:1px solid #000'><td></td><td></td><td></td><td></td></tr><tr id='TBL-6-5-'><td class='td11' id='TBL-6-5-1' style='white-space:normal; text-align:left;'> <!-- l. 21 --><p class='noindent'><span class='ptmr8t-x-x-90'>Iters = 30</span>      </p></td><td class='td11' id='TBL-6-5-2' style='white-space:normal; text-align:left;'> <!-- l. 22 --><p class='noindent'><span class='ptmr8t-x-x-90'>registration     ,     volunteer
+   applications  ,  and  student
+   travel  application  open  the
+   first  week  of  september  .
+   child care will be available
+   .</span>                                              </p></td><td class='td11' id='TBL-6-5-3' style='white-space:normal; text-align:left;'> <!-- l. 23 --><p class='noindent'><span class='ptmr8t-x-x-90'>we  welcome  proposals  for
+   tutor  **ials  on  either  core
+   machine  learning  topics  or
+   topics
+   of emerging importance for
+   machine learning .</span>                 </p></td><td class='td11' id='TBL-6-5-4' style='white-space:normal; text-align:left;'> <!-- l. 24 --><p class='noindent'><span class='ptmr8t-x-x-90'>we                               invite
+   submissions for the thirty -
+   third annual conference on
+   neural               information
+   processing systems .</span>              </p></td>
+</tr><tr class='hline' style='border-top:1px solid #000'><td></td><td></td><td></td><td></td></tr><tr id='TBL-6-6-'><td class='td11' id='TBL-6-6-1' style='white-space:normal; text-align:left;'> <!-- l. 26 --><p class='noindent'><span class='ptmr8t-x-x-90'>Original
+   Text</span>              </p></td><td class='td11' id='TBL-6-6-2' style='white-space:normal; text-align:left;'> <!-- l. 27 --><p class='noindent'><span class='ptmr8t-x-x-90'>Registration,         volunteer
+   applications,   and   student
+   travel  application  open  the
+   first   week   of   September.
+   Child care will be available.</span>   </p></td><td class='td11' id='TBL-6-6-3' style='white-space:normal; text-align:left;'> <!-- l. 28 --><p class='noindent'><span class='ptmr8t-x-x-90'>We welcome proposals for
+   tutorials
+   on    either    core    machine
+   learning   topics   or   topics
+   of emerging importance for
+   machine learning.</span>                  </p></td><td class='td11' id='TBL-6-6-4' style='white-space:normal; text-align:left;'> <!-- l. 29 --><p class='noindent'><span class='ptmr8t-x-x-90'>We     invite     submissions
+   for the Thirty-Third Annual
+   Conference     on     Neural
+   Information        Processing
+   Systems.</span>                                </p></td>
+</tr></table>                                                                                                                                                                                              </div>
+       
+       <figcaption class='caption'><span class='id'>Table 2: </span><span class='content'>The progress of deep leakage on language tasks.
+       </span></figcaption><!-- tex4ht:label?: x1-11001r2  -->
+                                                                                                                                                                      
+                                                                                                                                                                      
+       </figure>
+       </div>
+       <!-- l. 30 --><p class='noindent'>For language task, we verify our algorithm on Masked Language Model (MLM) task. In each sequence, 15% of
+       the words are replaced with a [MASK] token and MLM model attempts to predict the original value of the masked
+       words from a given context. We choose BERT <span class='cite'> [<a href='#Xdevlin2018bert'>8</a>]</span> as our backbone and adapt hyperparameters from the official
+       implementation <span class='footnote-mark'><a href='#fn1x0' id='fn1x0-bk'><sup class='textsuperscript'>*</sup></a></span><a id='x1-11002f1'></a>.
+       </p><!-- l. 32 --><p class='noindent'>Different from vision tasks where RGB inputs are continuous values, language models need to preprocess
+       discrete words into embeddings. We apply DLG on embedding space and minimize the gradients distance
+       between dummy embeddings and real ones. After optimization finishes, we derive original words by finding
+       the closest entry in the embedding matrix reversely.
+       </p><!-- l. 34 --><p class='noindent'>In Tab. <a href='#the-progress-of-deep-leakage-on-language-tasks-'>2<!-- tex4ht:ref: tab:experiment_nlp  --></a>, we exhibit the leaking history on three sentences selected from NeurIPS conference page. Similar
+       to the vision task, we start with randomly initialized embedding: the reverse query results at
+       iteration 0 is meaningless. During the optimization, the gradients produced by dummy embedding
+       gradually match the original ones and so the embeddings. In later iterations, part of sequence
+       gradually appears. In example 3, at iteration 20, ‘annual conference’ appeared and at iteration 30
+       and the leaked sentence is already close to the original one. When DLG finishes, though there
+       are few mismatches caused by the ambiguity in tokenizing, the main content is already fully
+       leaked.
+       </p>
+       <h3 class='sectionHead' id='defense-strategies'><span class='titlemark'>5    </span>   <a id='x1-120005'></a>Defense Strategies</h3>
+       
+       <h4 class='subsectionHead' id='noisy-gradients'><span class='titlemark'>5.1    </span>   <a id='x1-130005.1'></a>Noisy Gradients</h4>
+       <!-- l. 11 --><p class='noindent'>One straightforward attempt to defense DLG is to add noise on gradients before sharing. To evaluate, we
+       experiment Gaussian and Laplacian noise (widely used in differential privacy studies) distributions with
+       variance range from <span class='mathjax-inline'>\(10^{-1}\)</span> to <span class='mathjax-inline'>\(10^{-4}\)</span> and central <span class='mathjax-inline'>\(0\)</span>. From Fig. <a href='#x1-13001r1'>6a<!-- tex4ht:ref: fig:defense:gaussian  --></a> and <a href='#x1-13002r2'>6b<!-- tex4ht:ref: fig:defense:Laplacian  --></a>, we observe that the defense effect mainly
+       depends on the magnitude of distribution variance and less related to the noise types. When variance is at
+       the scale of <span class='mathjax-inline'>\(10^{-4}\)</span>, the noisy gradients do not prevent the leak. For noise with variance <span class='mathjax-inline'>\(10^{-3}\)</span>, though with
+       artifacts, the leakage can still be performed. Only when the variance is larger than <span class='mathjax-inline'>\(10^{-2}\)</span> and the noise
+       is starting affect the accuracy, DLG will fail to execute and Laplacian tends to slight better
+       at scale <span class='mathjax-inline'>\(10^{-3}\)</span>. However, noise with variance larger than <span class='mathjax-inline'>\(10^{-2}\)</span> will degrade the accuracy significantly
+       (Tab. <a href='#the-tradeoff-between-accuracy-and-defendability-g-gaussian-noise-l-laplacian-noise-fp-floating-number-int-integer-quantization-green-pzd-u-m-n-51means-it-successfully-defends-against-dlg-while-red-pzd-u-m-n-55means-fails-to-defend-whether-the-results-are-visually-recognizable-the-accuracy-is-evaluated-on-cifar100-'>3<!-- tex4ht:ref: tab:defense_vs_accuracy  --></a>).
+       </p><!-- l. 17 --><p class='noindent'>Another common perturbation on gradients is half precision, which was initially designed to save GPU
+       memory footprints and also widely used to reduce communication bandwidth. We test two popular half
+       precision implementations IEEE float16 (<span class='ptmri8t-'>Single-precision floating-point format</span>) and bfloat16 (<span class='ptmri8t-'>Brain
+       Floating Point</span> <span class='cite'> [<a href='#Xtagliavini2017transprecision'>35</a>]</span>, a truncated version of 32 bit float). Shown in Fig. <a href='#x1-13003r3'>6c<!-- tex4ht:ref: fig:defense:fp16  --></a>, both half precision
+       formats fail to protect the training data. We also test another popular low-bit representation
+       Int-8. Though it successfully prevents the leakage, the performance of model drops seriously
+       (Tab. <a href='#the-tradeoff-between-accuracy-and-defendability-g-gaussian-noise-l-laplacian-noise-fp-floating-number-int-integer-quantization-green-pzd-u-m-n-51means-it-successfully-defends-against-dlg-while-red-pzd-u-m-n-55means-fails-to-defend-whether-the-results-are-visually-recognizable-the-accuracy-is-evaluated-on-cifar100-'>3<!-- tex4ht:ref: tab:defense_vs_accuracy  --></a>).
+       </p>
+       <figure class='figure' id='x1-13005r7'><span id='the-effectiveness-of-various-defense-strategies-'></span> 
+
+                                                                                                                                                                      
+                                                                                                                                                                      
+                                                                                                                                                                      
+                                                                                                                                                                      
+       <div class='subfigure'>
+       <!-- l. 9 --><p class='noindent'></p><!-- l. 11 --><p class='noindent'> <img alt='PIC' height='194' src='figures/fig5_gaussian-crop-.png' width='194' /> <a id='x1-13001r1'></a></p>
+<div class='caption'><span class='id'><span class='ptmr8t-x-x-90'>(a) </span></span><span class='content'><span class='ptmr8t-x-x-90'>Defend with different magnitude Gaussian noise.</span>   </span></div></div> <div class='subfigure'>
+       <!-- l. 15 --><p class='noindent'></p><!-- l. 17 --><p class='noindent'> <img alt='PIC' height='194' src='figures/fig5_laplacian-crop-.png' width='194' /> <a id='x1-13002r2'></a></p>
+<div class='caption'><span class='id'><span class='ptmr8t-x-x-90'>(b) </span></span><span class='content'><span class='ptmr8t-x-x-90'>Defend with different magnitude Laplacian noise.</span> </span></div></div><br />
+       <div class='subfigure'>
+       <!-- l. 22 --><p class='noindent'></p><!-- l. 24 --><p class='noindent'> <img alt='PIC' height='194' src='figures/fig5_fp16-crop-.png' width='194' /> <a id='x1-13003r3'></a></p>
+<div class='caption'><span class='id'><span class='ptmr8t-x-x-90'>(c) </span></span><span class='content'><span class='ptmr8t-x-x-90'>Defend with fp16 convertion.</span>                                  </span></div></div> <div class='subfigure'>
+       <!-- l. 30 --><p class='noindent'> <img alt='PIC' height='194' src='figures/fig5_dgc-crop-.png' width='194' /> <a id='x1-13004r4'></a>
+</p>
+<div class='caption'><span class='id'><span class='ptmr8t-x-x-90'>(d) </span></span><span class='content'><span class='ptmr8t-x-x-90'>Defend with gradient pruning.</span>              </span></div>
+                                            </div> 
+       <div class='caption'><span class='id'>Figure 7: </span><span class='content'>The effectiveness of various defense strategies.
+       </span></div>
+                                                                                                                                                                      
+                                                                                                                                                                      
+       </figure>
+       <div class='table'>
+                                                                                                                                                                      
+                                                                                                                                                                      
+       <!-- l. 39 --><p class='noindent'></p><figure class='float' id='x1-13006r3'><span id='the-tradeoff-between-accuracy-and-defendability-g-gaussian-noise-l-laplacian-noise-fp-floating-number-int-integer-quantization-green-pzd-u-m-n-51means-it-successfully-defends-against-dlg-while-red-pzd-u-m-n-55means-fails-to-defend-whether-the-results-are-visually-recognizable-the-accuracy-is-evaluated-on-cifar100-'></span>
+                                                                                                                                                                      
+                                                                                                                                                                      
+       <div class='tabular'> <table class='tabular' id='TBL-7'><colgroup id='TBL-7-1g'><col id='TBL-7-1' /></colgroup><colgroup id='TBL-7-2g'><col id='TBL-7-2' /></colgroup><colgroup id='TBL-7-3g'><col id='TBL-7-3' /></colgroup><colgroup id='TBL-7-4g'><col id='TBL-7-4' /></colgroup><colgroup id='TBL-7-5g'><col id='TBL-7-5' /></colgroup><colgroup id='TBL-7-6g'><col id='TBL-7-6' /></colgroup><colgroup id='TBL-7-7g'><col id='TBL-7-7' /></colgroup><colgroup id='TBL-7-8g'><col id='TBL-7-8' /></colgroup><colgroup id='TBL-7-9g'><col id='TBL-7-9' /></colgroup><colgroup id='TBL-7-10g'><col id='TBL-7-10' /></colgroup><colgroup id='TBL-7-11g'><col id='TBL-7-11' /></colgroup><tr id='TBL-7-1-'><td class='td11' id='TBL-7-1-1' style='white-space:normal; text-align:center;'>           </td><td class='td11' id='TBL-7-1-2' style='white-space:normal; text-align:center;'> <span class='ptmr8t-x-x-90'>Original  </span> </td><td class='td11' id='TBL-7-1-3' style='white-space:normal; text-align:center;'>  <span class='ptmb8t-x-x-90'>G</span><span class='ptmr8t-x-x-90'>-</span><span class='mathjax-inline'>\(10^{-4}\)</span>    </td><td class='td11' id='TBL-7-1-4' style='white-space:normal; text-align:center;'>  <span class='ptmb8t-x-x-90'>G</span><span class='ptmr8t-x-x-90'>-</span><span class='mathjax-inline'>\(10^{-3}\)</span>    </td><td class='td11' id='TBL-7-1-5' style='white-space:normal; text-align:center;'>  <span class='ptmb8t-x-x-90'>G</span><span class='ptmr8t-x-x-90'>-</span><span class='mathjax-inline'>\(10^{-2}\)</span>    </td><td class='td11' id='TBL-7-1-6' style='white-space:normal; text-align:center;'> <span class='ptmb8t-x-x-90'>G</span><span class='ptmr8t-x-x-90'>-</span><span class='mathjax-inline'>\(10^{-1}\)</span>   </td><td class='td11' id='TBL-7-1-7' style='white-space:normal; text-align:center;'> <span class='ptmb8t-x-x-90'>FP</span><span class='ptmr8t-x-x-90'>-16  </span></td>
+</tr><tr class='hline' style='border-top:1px solid #000'><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr id='TBL-7-2-'><td class='td11' id='TBL-7-2-1' style='white-space:normal; text-align:center;'>  <span class='ptmr8t-x-x-90'>Accuracy     </span> </td><td class='td11' id='TBL-7-2-2' style='white-space:normal; text-align:center;'> <span class='ptmr8t-x-x-90'>76.3%   </span> </td><td class='td11' id='TBL-7-2-3' style='white-space:normal; text-align:center;'> <span class='ptmr8t-x-x-90'>75.6%  </span></td><td class='td11' id='TBL-7-2-4' style='white-space:normal; text-align:center;'> <span class='ptmr8t-x-x-90'>73.3%  </span></td><td class='td11' id='TBL-7-2-5' style='white-space:normal; text-align:center;'> <span class='ptmr8t-x-x-90'>45.3%  </span></td><td class='td11' id='TBL-7-2-6' style='white-space:normal; text-align:center;'> <span class='mathjax-inline'>\(\le \)</span><span class='ptmr8t-x-x-90'>1%  </span> </td><td class='td11' id='TBL-7-2-7' style='white-space:normal; text-align:center;'> <span class='ptmr8t-x-x-90'>76.1%  </span></td>
+</tr><tr class='hline' style='border-top:1px solid #000'><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr id='TBL-7-3-'><td class='td11' id='TBL-7-3-1' style='white-space:normal; text-align:center;'> <span class='ptmr8t-x-x-90'>Defendability  </span> </td><td class='td11' id='TBL-7-3-2' style='white-space:normal; text-align:center;'>   <span class='ptmr8t-x-x-90'>–       </span> </td><td class='td11' id='TBL-7-3-3' style='white-space:normal; text-align:center;'>   <span style='color:#FF0000;'><span class='pzdr-x-x-90'>✗</span></span>     </td><td class='td11' id='TBL-7-3-4' style='white-space:normal; text-align:center;'>   <span style='color:#FF0000;'><span class='pzdr-x-x-90'>✗</span></span>     </td><td class='td11' id='TBL-7-3-5' style='white-space:normal; text-align:center;'>  <span style='color:#00FF00;'><span class='pzdr-x-x-90'>✓</span></span>     </td><td class='td11' id='TBL-7-3-6' style='white-space:normal; text-align:center;'> <span style='color:#00FF00;'><span class='pzdr-x-x-90'>✓</span></span>   </td><td class='td11' id='TBL-7-3-7' style='white-space:normal; text-align:center;'>   <span style='color:#FF0000;'><span class='pzdr-x-x-90'>✗</span></span>     </td>
+</tr><tr class='hline' style='border-top:1px solid #000'><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr id='TBL-7-4-'><td class='td11' id='TBL-7-4-1' style='white-space:normal; text-align:center;'>            </td><td class='td11' id='TBL-7-4-2' style='white-space:normal; text-align:center;'>        </td><td class='td11' id='TBL-7-4-3' style='white-space:normal; text-align:center;'>  <span class='ptmb8t-x-x-90'>L</span><span class='ptmr8t-x-x-90'>-</span><span class='mathjax-inline'>\(10^{-4}\)</span>     </td><td class='td11' id='TBL-7-4-4' style='white-space:normal; text-align:center;'>  <span class='ptmb8t-x-x-90'>L</span><span class='ptmr8t-x-x-90'>-</span><span class='mathjax-inline'>\(10^{-3}\)</span>     </td><td class='td11' id='TBL-7-4-5' style='white-space:normal; text-align:center;'>  <span class='ptmb8t-x-x-90'>L</span><span class='ptmr8t-x-x-90'>-</span><span class='mathjax-inline'>\(10^{-2}\)</span>     </td><td class='td11' id='TBL-7-4-6' style='white-space:normal; text-align:center;'> <span class='ptmb8t-x-x-90'>L</span><span class='ptmr8t-x-x-90'>-</span><span class='mathjax-inline'>\(10^{-1}\)</span>   </td><td class='td11' id='TBL-7-4-7' style='white-space:normal; text-align:center;'> <span class='ptmb8t-x-x-90'>Int</span><span class='ptmr8t-x-x-90'>-8  </span></td></tr><tr class='hline' style='border-top:1px solid #000'><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr id='TBL-7-5-'><td class='td11' id='TBL-7-5-1' style='white-space:normal; text-align:center;'> <span class='ptmr8t-x-x-90'>Accuracy </span>
+ </td><td class='td11' id='TBL-7-5-2' style='white-space:normal; text-align:center;'>   <span class='ptmr8t-x-x-90'>–       </span> </td><td class='td11' id='TBL-7-5-3' style='white-space:normal; text-align:center;'> <span class='ptmr8t-x-x-90'>75.6%  </span></td><td class='td11' id='TBL-7-5-4' style='white-space:normal; text-align:center;'> <span class='ptmr8t-x-x-90'>73.4%  </span></td><td class='td11' id='TBL-7-5-5' style='white-space:normal; text-align:center;'> <span class='ptmr8t-x-x-90'>46.2%  </span></td><td class='td11' id='TBL-7-5-6' style='white-space:normal; text-align:center;'> <span class='mathjax-inline'>\(\le \)</span><span class='ptmr8t-x-x-90'>1%  </span> </td><td class='td11' id='TBL-7-5-7' style='white-space:normal; text-align:center;'> <span class='ptmr8t-x-x-90'>53.7%  </span></td></tr><tr class='hline' style='border-top:1px solid #000'><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr id='TBL-7-6-'><td class='td11' id='TBL-7-6-1' style='white-space:normal; text-align:center;'> <span class='ptmr8t-x-x-90'>Defendability </span>
+ </td><td class='td11' id='TBL-7-6-2' style='white-space:normal; text-align:center;'>   <span class='ptmr8t-x-x-90'>–       </span> </td><td class='td11' id='TBL-7-6-3' style='white-space:normal; text-align:center;'>   <span style='color:#FF0000;'><span class='pzdr-x-x-90'>✗</span></span>     </td><td class='td11' id='TBL-7-6-4' style='white-space:normal; text-align:center;'>   <span style='color:#FF0000;'><span class='pzdr-x-x-90'>✗</span></span>     </td><td class='td11' id='TBL-7-6-5' style='white-space:normal; text-align:center;'>  <span style='color:#00FF00;'><span class='pzdr-x-x-90'>✓</span></span>     </td><td class='td11' id='TBL-7-6-6' style='white-space:normal; text-align:center;'> <span style='color:#00FF00;'><span class='pzdr-x-x-90'>✓</span></span>   </td><td class='td11' id='TBL-7-6-7' style='white-space:normal; text-align:center;'>  <span style='color:#00FF00;'><span class='pzdr-x-x-90'>✓</span></span>     </td></tr></table>                   </div>
+       
+       <figcaption class='caption'><span class='id'>Table 3: </span><span class='content'>The trade-off between accuracy and defendability. <span class='ptmb8t-'>G</span>: Gaussian noise, <span class='ptmb8t-'>L</span>: Laplacian noise,
+<span class='ptmb8t-'>FP</span>: Floating number, <span class='ptmb8t-'>Int</span>: Integer quantization. <span style='color:#00FF00;'><span class='pzdr-'>✓</span></span> means it successfully defends against DLG while
+<span style='color:#FF0000;'><span class='pzdr-'>✗</span></span> means fails to defend (whether the results are visually recognizable). The accuracy is evaluated
+on CIFAR-100.                                                                                                                                      </span></figcaption><!-- tex4ht:label?: x1-13006r3  -->
+                                                                                                                                                                      
+                                                                                                                                                                      
+       </figure>
+       </div>
+       
+       <h4 class='subsectionHead' id='gradient-compression-and-sparsification'><span class='titlemark'>5.2    </span>   <a id='x1-140005.2'></a>Gradient Compression and Sparsification</h4>
+       <!-- l. 22 --><p class='noindent'>We next experimented to defend by gradient compression <span class='cite'> [<a href='#Xlin2017deep'>24</a>, <a href='#Xtsuzuku2018variance'>36</a>]</span>: Gradients with small magnitudes are
+       pruned to zero. It’s more difficult for DLG to match the gradients as the optimization targets are pruned. We
+       evaluate how different level of sparsities (range from 1% to 70%) defense the leakage. When
+       sparsity is 1% to 10%, it has almost no effects against DLG. When prune ratio increases to 20%,
+       as shown in Fig. <a href='#x1-13004r4'>6d<!-- tex4ht:ref: fig:defense:dgc  --></a>, there are obvious artifact pixels on the recover images. We notice that
+       maximum tolerance of sparsity is around 20%. When pruning ratio is larger, the recovered images
+       are no longer visually recognizable and thus gradient compression successfully prevents the
+       leakage.
+       </p><!-- l. 29 --><p class='noindent'>Previous work <span class='cite'> [<a href='#Xtsuzuku2018variance'>36</a>, <a href='#Xlin2017deep'>24</a>]</span> show that gradients can be compressed by more than 300<span class='mathjax-inline'>\(\textbf {}\times \)</span> without losing accuracy
+       by error compensation techniques. In this case, the sparsity is above 99% and already exceeds the maximum
+       tolerance of DLG (which is around 20%). It suggests that compressing the gradients is a practical approach
+       to avoid the deep leakage.
+       
+       </p>
+       <h4 class='subsectionHead' id='large-batch-high-resolution-and-cryptology'><span class='titlemark'>5.3    </span>   <a id='x1-150005.3'></a>Large Batch, High Resolution and Cryptology</h4>
+       <!-- l. 33 --><p class='noindent'>If changes on training settings are allowed, then there are more defense strategies. As suggested
+       in Tab. <a href='#the-iterations-required-for-restore-batched-data-on-cifar-krizhevsky2009cifar-dataset-'>1<!-- tex4ht:ref: tab:batched_restore  --></a>, increasing the batch size makes the leakage more difficult because there are more
+       variables to solve during optimization. Following the idea, upscaling the input images can be
+       also a good defense, though some changes on CNN architectures is required. According to
+       our experiments, DLG currently only works for batch size up to 8 and image resolution up to
+       64<span class='mathjax-inline'>\(\times \)</span>64.
+       </p><!-- l. 39 --><p class='noindent'>Beside methods above, cryptology can be also used to prevent the leakage: Bonawitz <span class='ptmri8t-'>et al</span>. <span class='cite'> [<a href='#Xbonawitz16secure_Aggregation'>5</a>]</span> designs a
+       secure aggregation protocols and Phong <span class='ptmri8t-'>et al</span>. <span class='cite'> [<a href='#Xphong2018privacy'>31</a>]</span> proposes to encrypt the gradients before sending.
+       Among all defenses, cryptology is the most secured one. However, both methods have their
+       limitations and not general enough: secure aggregation <span class='cite'> [<a href='#Xbonawitz16secure_Aggregation'>5</a>]</span> requires gradients to be integers thus not
+       compatible with most CNNs, and homomorphic encryption <span class='cite'> [<a href='#Xphong2018privacy'>31</a>]</span> is against parameter server
+       only.
+       
+       </p>
+       <h3 class='sectionHead' id='conclusions'><span class='titlemark'>6    </span>   <a id='x1-160006'></a>Conclusions</h3>
+       <!-- l. 43 --><p class='noindent'>In this paper, we introduce the <span class='ptmri8t-'>Deep Leakage from Gradients </span>(DLG): an algorithm that can obtain the local
+       training data from public shared gradients. DLG does not rely on any generative model or extra prior about
+       the data. Our experiments on vision and language tasks both demonstrate the critical risks of such
+       deep leakage and show that such deep leakage can be only prevented when defense strategies
+       starts to degrade the accuracy. This sets a challenge to modern multi-node learning system (e.g.,
+       distributed training, federated learning). We hope this work would raise people’s awareness about the
+       security of gradients and bring the community to rethink the safety of existing gradient sharing
+       scheme.
+       
+                                                                                                                                                                      
+                                                                                                                                                                      
+       </p>
+       <h3 class='likesectionHead' id='acknowledgments'>  <a id='x1-17000'></a>Acknowledgments</h3>
+       <!-- l. 58 --><p class='noindent'>We sincerely thank MIT-IBM Watson AI lab, Intel, Facebook and AWS for supporting this work. We
+       sincerely thank John Cohn for the discussions.
+       
+       </p>
+       <h3 class='likesectionHead' id='references'>  <a id='x1-18000'></a><span class='ptmr8t-x-x-90'>References</span></h3>
+       <!-- l. 1 --><p class='noindent'>
+           </p><section class='thebibliography' role='doc-bibliography'><dl><dt>
+         <span class='ptmr8t-x-x-90'>[1]</span></dt><dd><a id='Xtensorflow2015-whitepaper'></a><span class='ptmr8t-x-x-90'>Martín  Abadi,  Ashish  Agarwal,  Paul  Barham,  Eugene  Brevdo,  Zhifeng  Chen,  Craig  Citro,  Greg S.
+           Corrado, Andy Davis, Jeffrey Dean, Matthieu Devin, Sanjay Ghemawat, Ian Goodfellow, Andrew Harp,
+           Geoffrey Irving, Michael Isard, Yangqing Jia, Rafal Jozefowicz, Lukasz Kaiser, Manjunath Kudlur, Josh
+           Levenberg, Dan Mané, Rajat Monga, Sherry Moore, Derek Murray, Chris Olah, Mike Schuster, Jonathon
+           Shlens, Benoit Steiner, Ilya Sutskever, Kunal Talwar, Paul Tucker, Vincent Vanhoucke, Vijay Vasudevan,
+           Fernanda Viégas, Oriol Vinyals, Pete Warden, Martin Wattenberg, Martin Wicke, Yuan Yu, and Xiaoqiang
+           Zheng.  TensorFlow: Large-scale machine learning on heterogeneous systems, 2015.  Software available
+           from tensorflow.org.</span>
+           </dd><dt>
+         <span class='ptmr8t-x-x-90'>[2]</span></dt><dd><a id='Xchainermn_mlsys2017'></a><span class='ptmr8t-x-x-90'>Takuya  Akiba,  Keisuke  Fukuda,  and  Shuji  Suzuki.   ChainerMN:  Scalable  Distributed  Deep  Learning
+           Framework. In </span><span class='ptmri8t-x-x-90'>Proceedings of Workshop on ML Systems in The Thirty-first Annual Conference on Neural
+           Information Processing Systems (NIPS)</span><span class='ptmr8t-x-x-90'>, 2017.</span>
+           </dd><dt>
+         <span class='ptmr8t-x-x-90'>[3]</span></dt><dd><a id='Xbarney2010introduction_to_parallel_computing'></a><span class='ptmr8t-x-x-90'>Blaise Barney et al. Introduction to parallel computing.</span>
+           </dd><dt>
+         <span class='ptmr8t-x-x-90'>[4]</span></dt><dd><a id='Xbonawitz2019towards'></a><span class='ptmr8t-x-x-90'>Keith Bonawitz, Hubert Eichner, Wolfgang Grieskamp, Dzmitry Huba, Alex Ingerman, Vladimir Ivanov,
+           Chloe  Kiddon,  Jakub  Konecny,  Stefano  Mazzocchi,  H Brendan  McMahan,  et al.   Towards  federated
+           learning at scale: System design. </span><span class='ptmri8t-x-x-90'>arXiv preprint arXiv:1902.01046</span><span class='ptmr8t-x-x-90'>, 2019.</span>
+           </dd><dt>
+         <span class='ptmr8t-x-x-90'>[5]</span></dt><dd><a id='Xbonawitz16secure_Aggregation'></a><span class='ptmr8t-x-x-90'>Keith Bonawitz, Vladimir Ivanov, Ben Kreuter, Antonio Marcedone, H. Brendan McMahan, Sarvar Patel,
+           Daniel  Ramage,  Aaron  Segal,  and  Karn  Seth.   Practical  secure  aggregation  for  federated  learning  on
+           user-held data. </span><span class='ptmri8t-x-x-90'>CoRR</span><span class='ptmr8t-x-x-90'>, abs/1611.04482, 2016.</span>
+           </dd><dt>
+         <span class='ptmr8t-x-x-90'>[6]</span></dt><dd><a id='Xchen2015mxnet'></a><span class='ptmr8t-x-x-90'>Tianqi Chen, Mu Li, Yutian Li, Min Lin, Naiyan Wang, Minjie Wang, Tianjun Xiao, Bing Xu, Chiyuan
+           Zhang, and Zheng Zhang.   Mxnet: A flexible and efficient machine learning library for heterogeneous
+           distributed systems. </span><span class='ptmri8t-x-x-90'>arXiv preprint arXiv:1512.01274</span><span class='ptmr8t-x-x-90'>, 2015.</span>
+           </dd><dt>
+         <span class='ptmr8t-x-x-90'>[7]</span></dt><dd><a id='Xdean2012large'></a><span class='ptmr8t-x-x-90'>Jeffrey Dean, Greg Corrado, Rajat Monga, Kai Chen, Matthieu Devin, Mark Mao, Andrew Senior, Paul
+           Tucker,  Ke  Yang,  Quoc V  Le,  et al.   Large  scale  distributed  deep  networks.   In  </span><span class='ptmri8t-x-x-90'>Advances  in  neural
+           information processing systems</span><span class='ptmr8t-x-x-90'>, pages 1223–1231, 2012.</span>
+           </dd><dt>
+         <span class='ptmr8t-x-x-90'>[8]</span></dt><dd><a id='Xdevlin2018bert'></a><span class='ptmr8t-x-x-90'>Jacob  Devlin,  Ming-Wei  Chang,  Kenton  Lee,  and  Kristina  Toutanova.    BERT:  pre-training  of  deep
+           bidirectional transformers for language understanding. </span><span class='ptmri8t-x-x-90'>CoRR</span><span class='ptmr8t-x-x-90'>, abs/1810.04805, 2018.</span>
+           </dd><dt>
+         <span class='ptmr8t-x-x-90'>[9]</span></dt><dd><a id='Xfredrikson2015model_inversion'></a><span class='ptmr8t-x-x-90'>Matt Fredrikson, Somesh Jha, and Thomas Ristenpart.  Model inversion attacks that exploit confidence
+           information  and  basic  countermeasures.    In  </span><span class='ptmri8t-x-x-90'>Proceedings  of  the  22nd  ACM  SIGSAC  Conference  on
+           Computer and Communications Security</span><span class='ptmr8t-x-x-90'>, pages 1322–1333. ACM, 2015.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[10]</span></dt><dd><a id='Xgoodfellow2014generative'></a><span class='ptmr8t-x-x-90'>Ian Goodfellow, Jean Pouget-Abadie, Mehdi Mirza, Bing Xu, David Warde-Farley, Sherjil Ozair, Aaron
+           Courville, and Yoshua Bengio. Generative adversarial nets. In </span><span class='ptmri8t-x-x-90'>Advances in neural information processing
+           systems</span><span class='ptmr8t-x-x-90'>, pages 2672–2680, 2014.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[11]</span></dt><dd><a id='Xgoyal2017accurate'></a><span class='ptmr8t-x-x-90'>Priya Goyal, Piotr Dollár, Ross Girshick, Pieter Noordhuis, Lukasz Wesolowski, Aapo Kyrola, Andrew
+           Tulloch, Yangqing Jia, and Kaiming He.   Accurate, large minibatch sgd: Training imagenet in 1 hour.
+           </span><span class='ptmri8t-x-x-90'>arXiv preprint arXiv:1706.02677</span><span class='ptmr8t-x-x-90'>, 2017.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[12]</span></dt><dd><a id='Xhe2016deep'></a><span class='ptmr8t-x-x-90'>Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Deep residual learning for image recognition.
+           In </span><span class='ptmri8t-x-x-90'>Proceedings of the IEEE conference on computer vision and pattern recognition</span><span class='ptmr8t-x-x-90'>, pages 770–778, 2016.</span>
+                                                                                                                                                                                        
+                                                                                                                                                                                        
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[13]</span></dt><dd><a id='Xhitaj2017information'></a><span class='ptmr8t-x-x-90'>Briland Hitaj, Giuseppe Ateniese, and Fernando Pérez-Cruz.  Deep models under the GAN: information
+           leakage from collaborative deep learning. </span><span class='ptmri8t-x-x-90'>CoRR</span><span class='ptmr8t-x-x-90'>, abs/1702.07464, 2017.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[14]</span></dt><dd><a id='XLFWTech'></a><span class='ptmr8t-x-x-90'>Gary B. Huang, Manu Ramesh, Tamara Berg, and Erik Learned-Miller.   Labeled faces in the wild: A
+           database for studying face recognition in unconstrained environments. Technical Report 07-49, University
+           of Massachusetts, Amherst, October 2007.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[15]</span></dt><dd><a id='Xiandola2016firecaffe'></a><span class='ptmr8t-x-x-90'>Forrest N  Iandola,  Matthew W  Moskewicz,  Khalid  Ashraf,  and  Kurt  Keutzer.   Firecaffe:  near-linear
+           acceleration of deep neural network training on compute clusters. In </span><span class='ptmri8t-x-x-90'>Proceedings of the IEEE Conference
+           on Computer Vision and Pattern Recognition</span><span class='ptmr8t-x-x-90'>, pages 2592–2600, 2016.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[16]</span></dt><dd><a id='Xjia2018highly'></a><span class='ptmr8t-x-x-90'>Xianyan  Jia,  Shutao  Song,  Wei  He,  Yangzihao  Wang,  Haidong  Rong,  Feihu  Zhou,  Liqiang  Xie,
+           Zhenyu  Guo,  Yuanzhou  Yang,  Liwei  Yu,  et al.    Highly  scalable  deep  learning  training  system  with
+           mixed-precision: Training imagenet in four minutes. </span><span class='ptmri8t-x-x-90'>arXiv preprint arXiv:1807.11205</span><span class='ptmr8t-x-x-90'>, 2018.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[17]</span></dt><dd><a id='Xjochems2017developing'></a><span class='ptmr8t-x-x-90'>Arthur Jochems, Timo M Deist, Issam El Naqa, Marc Kessler, Chuck Mayo, Jackson Reeves, Shruti
+           Jolly, Martha Matuszak, Randall Ten Haken, Johan van Soest, et al. Developing and validating a survival
+           prediction model for nsclc patients through distributed learning across 3 countries. </span><span class='ptmri8t-x-x-90'>International Journal
+           of Radiation Oncology* Biology* Physics</span><span class='ptmr8t-x-x-90'>, 99(2):344–352, 2017.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[18]</span></dt><dd><a id='Xjochems2016distributed'></a><span class='ptmr8t-x-x-90'>Arthur Jochems, Timo M Deist, Johan Van Soest, Michael Eble, Paul Bulens, Philippe Coucke, Wim
+           Dries, Philippe Lambin, and Andre Dekker. Distributed learning: developing a predictive model based on
+           data from multiple hospitals without data leaving the hospital–a real life proof of concept.  </span><span class='ptmri8t-x-x-90'>Radiotherapy
+           and Oncology</span><span class='ptmr8t-x-x-90'>, 121(3):459–467, 2016.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[19]</span></dt><dd><a id='Xkim2016deepspark'></a><span class='ptmr8t-x-x-90'>Hanjoo  Kim,  Jaehong  Park,  Jaehee  Jang,  and  Sungroh  Yoon.   Deepspark:  Spark-based  deep  learning
+           supporting asynchronous updates and caffe compatibility. </span><span class='ptmri8t-x-x-90'>arXiv preprint arXiv:1602.08191</span><span class='ptmr8t-x-x-90'>, 2016.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[20]</span></dt><dd><a id='Xgoogle2016federated'></a><span class='ptmr8t-x-x-90'>Jakub  Konečný,  H. Brendan  McMahan,  Felix X.  Yu,  Peter  Richtarik,  Ananda Theertha  Suresh,  and
+           Dave Bacon.  Federated learning: Strategies for improving communication efficiency.  In </span><span class='ptmri8t-x-x-90'>NIPS Workshop
+           on Private Multi-Party Machine Learning</span><span class='ptmr8t-x-x-90'>, 2016.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[21]</span></dt><dd><a id='Xkrizhevsky2009cifar'></a><span class='ptmr8t-x-x-90'>Alex Krizhevsky. Learning multiple layers of features from tiny images. Technical report, Citeseer, 2009.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[22]</span></dt><dd><a id='Xlecun1998mnist'></a><span class='ptmr8t-x-x-90'>Yann LeCun. The mnist database of handwritten digits. </span><span class='ptmri8t-x-x-90'>http://yann. lecun. com/exdb/mnist/</span><span class='ptmr8t-x-x-90'>.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[23]</span></dt><dd><a id='Xli2014scaling'></a><span class='ptmr8t-x-x-90'>Mu Li, David G Andersen, Jun Woo Park, Alexander J Smola, Amr Ahmed, Vanja Josifovski, James
+           Long, Eugene J Shekita, and Bor-Yiing Su.   Scaling distributed machine learning with the parameter
+           server. In </span><span class='ptmri8t-x-x-90'>11th </span><span class='mathjax-inline'>\(\{\)</span><span class='ptmri8t-x-x-90'>USENIX</span><span class='mathjax-inline'>\(\}\) </span><span class='ptmri8t-x-x-90'>Symposium on Operating Systems Design and Implementation (</span><span class='mathjax-inline'>\(\{\)</span><span class='ptmri8t-x-x-90'>OSDI</span><span class='mathjax-inline'>\(\}\) </span><span class='ptmri8t-x-x-90'>14)</span><span class='ptmr8t-x-x-90'>, pages
+           583–598, 2014.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[24]</span></dt><dd><a id='Xlin2017deep'></a><span class='ptmr8t-x-x-90'>Yujun Lin, Song Han, Huizi Mao, Yu Wang, and William J Dally. Deep gradient compression: Reducing
+           the communication bandwidth for distributed training. </span><span class='ptmri8t-x-x-90'>arXiv preprint arXiv:1712.01887</span><span class='ptmr8t-x-x-90'>, 2017.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[25]</span></dt><dd><a id='Xliu1989lbfgs'></a><span class='ptmr8t-x-x-90'>Dong C  Liu  and  Jorge  Nocedal.   On  the  limited  memory  bfgs  method  for  large  scale  optimization.
+           </span><span class='ptmri8t-x-x-90'>Mathematical programming</span><span class='ptmr8t-x-x-90'>, 45(1-3):503–528, 1989.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[26]</span></dt><dd><a id='Xmcmahan2016communication'></a><span class='ptmr8t-x-x-90'>H Brendan McMahan, Eider Moore, Daniel Ramage, Seth Hampson, et al.   Communication-efficient
+           learning of deep networks from decentralized data. </span><span class='ptmri8t-x-x-90'>arXiv preprint arXiv:1602.05629</span><span class='ptmr8t-x-x-90'>, 2016.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[27]</span></dt><dd><a id='XMelis2018unintended'></a><span class='ptmr8t-x-x-90'>Luca Melis, Congzheng Song, Emiliano De Cristofaro, and Vitaly Shmatikov.   Exploiting unintended
+           feature leakage in collaborative learning. </span><span class='ptmri8t-x-x-90'>CoRR</span><span class='ptmr8t-x-x-90'>, abs/1805.04049, 2018.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[28]</span></dt><dd><a id='Xnetzer2011svhn'></a><span class='ptmr8t-x-x-90'>Yuval Netzer, Tao Wang, Adam Coates, Alessandro Bissacco, Bo Wu, and Andrew Y Ng. Reading digits
+           in natural images with unsupervised feature learning. 2011.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[29]</span></dt><dd><a id='Xpaszke2017pytorch'></a><span class='ptmr8t-x-x-90'>Adam Paszke, Sam Gross, Soumith Chintala, Gregory Chanan, Edward Yang, Zachary DeVito, Zeming
+           Lin, Alban Desmaison, Luca Antiga, and Adam Lerer.  Automatic differentiation in pytorch.  In </span><span class='ptmri8t-x-x-90'>NIPS-W</span><span class='ptmr8t-x-x-90'>,
+           2017.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[30]</span></dt><dd><a id='Xpatarasuk2009ring_all_reduce'></a><span class='ptmr8t-x-x-90'>Pitch Patarasuk and Xin Yuan.   Bandwidth optimal all-reduce algorithms for clusters of workstations.
+           </span><span class='ptmri8t-x-x-90'>Journal of Parallel and Distributed Computing</span><span class='ptmr8t-x-x-90'>, 69(2):117–124, 2009.</span>
+                                                                                                                                                                                        
+                                                                                                                                                                                        
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[31]</span></dt><dd><a id='Xphong2018privacy'></a><span class='ptmr8t-x-x-90'>Le Trieu Phong, Yoshinori Aono, Takuya Hayashi, Lihua Wang, and Shiho Moriai.  Privacy-preserving
+           deep learning via additively homomorphic encryption.  </span><span class='ptmri8t-x-x-90'>IEEE Transactions on Information Forensics and
+           Security</span><span class='ptmr8t-x-x-90'>, 13(5):1333–1345, 2018.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[32]</span></dt><dd><a id='Xrecht2011hogwild'></a><span class='ptmr8t-x-x-90'>Benjamin  Recht,  Christopher  Re,  Stephen  Wright,  and  Feng  Niu.   Hogwild:  A  lock-free  approach  to
+           parallelizing stochastic gradient descent.  In </span><span class='ptmri8t-x-x-90'>Advances in neural information processing systems</span><span class='ptmr8t-x-x-90'>, pages
+           693–701, 2011.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[33]</span></dt><dd><a id='Xsergeev2018horovod'></a><span class='ptmr8t-x-x-90'>Alexander Sergeev and Mike Del Balso.  Horovod: fast and easy distributed deep learning in tensorflow.
+           </span><span class='ptmri8t-x-x-90'>arXiv preprint arXiv:1802.05799</span><span class='ptmr8t-x-x-90'>, 2018.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[34]</span></dt><dd><a id='Xshokri2017membership'></a><span class='ptmr8t-x-x-90'>Reza Shokri, Marco Stronati, Congzheng Song, and Vitaly Shmatikov.   Membership inference attacks
+           against machine learning models.  In </span><span class='ptmri8t-x-x-90'>2017 IEEE Symposium on Security and Privacy (SP)</span><span class='ptmr8t-x-x-90'>, pages 3–18.
+           IEEE, 2017.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[35]</span></dt><dd><a id='Xtagliavini2017transprecision'></a><span class='ptmr8t-x-x-90'>Giuseppe Tagliavini, Stefan Mach, Davide Rossi, Andrea Marongiu, and Luca Benini.  A transprecision
+           floating-point platform for ultra-low power computing. </span><span class='ptmri8t-x-x-90'>CoRR</span><span class='ptmr8t-x-x-90'>, abs/1711.10374, 2017.</span>
+           </dd><dt>
+        <span class='ptmr8t-x-x-90'>[36]</span></dt><dd><a id='Xtsuzuku2018variance'></a><span class='ptmr8t-x-x-90'>Yusuke Tsuzuku, Hiroto Imachi, and Takuya Akiba.  Variance-based gradient compression for efficient
+           distributed deep learning. </span><span class='ptmri8t-x-x-90'>arXiv preprint arXiv:1802.06058</span><span class='ptmr8t-x-x-90'>, 2018.</span>
+           </dd></dl></section>
+       <div class='footnotes'><aside class='footnotetext' role='doc-footnote'>
+<!-- l. 30 --><p class='noindent'><a id='x1-11003x4.2'></a><span class='footnote-mark'><a href='#fn1x0-bk' id='fn1x0'><sup class='textsuperscript'>*</sup></a></span><a class='url' href='https://github.com/google-research/bert'><span class='ectt-0900'>https://github.com/google-research/bert</span></a></p></aside> 
+                                          </div>
+        
+</body> 
+</html>
