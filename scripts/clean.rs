@@ -10,8 +10,9 @@ use std::{fs, path::Path};
 fn main() -> Result<()> {
     remove_dir_if_exists("work")?;
     remove_dir_if_exists("dist")?;
+    remove_dir_if_exists(".tex-cache")?;
 
-    println!("Removed: work/, dist/");
+    println!("Removed: work/, dist/, .tex-cache/");
 
     Ok(())
 }
