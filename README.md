@@ -1,0 +1,66 @@
+arXivからとってきたTeXのtar.gzから，HTMLを生成するツール．
+
+macで動作確認．windows, linuxでも動くはず（未確認）
+
+*なんのために？*
+ブラウザの翻訳拡張機能をつかって快適に読みたい．
+というかPLaMo翻訳拡張機能が使いたい．
+
+ついでに，変換したHTMLをpushすると，github pagesで公開されるようにしている．
+
+
+
+## 依存関係
+- Rust
+- rust-script
+- cargo-make
+- texlive
+
+特に，texliveまわりは色々エラーが出るかもしれない．そのときは生成AIに聞いてどうにかしてほしい．texliveの困りポイントは対応しきれないので．
+
+Rustのインストール: https://rust-lang.org/ja/tools/install/
+
+rust-scriptのインストール: 
+```bash
+cargo install rust-script
+```
+公式サイト：https://rust-script.org/
+
+cargo-makeのインストール: 
+```bash
+cargo install cargo-make
+```
+https://github.com/sagiegurari/cargo-make
+
+texliveのインストール: 各々調べてほしい．
+
+
+## 使い方
+1. arXivとかからTeXのtar.gzをダウンロードしてくる．
+2. `cargo make build`を実行する．
+3. `dist/<filename>/index.html`が生成される．ブラウザで開いてみる．
+4. 自分のところでgithub pagesを設定していれば，pushする．公開される．
+
+### step0
+必要な依存関係をインストール
+
+### step1
+![arXiv右上，AccessPaper の下にView PDFがある． その1つ下に，TeXソースをダウンロードできるボタンがある．](image.png)
+
+ここから，該当論文のTeXソース(.tar.gz形式)をダウンロードする．
+
+### step2
+ダウンロードした`tar.gz`を, `sources/`に移動する．
+
+### step3
+`cargo make build`を実行する．
+
+### step4
+`dist/<filename>/index.html`が生成される．ブラウザで開いてみる．
+
+## 困ったら
+私に適当に聞いてくれれば，texliveのエラー以外は対応する．
+
+## その他
+Rust好きなのでRustでスクリプトも書いています．
+それにどのOS(windos, linux, mac)でも動かせるし．
