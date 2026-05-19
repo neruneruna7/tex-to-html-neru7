@@ -246,6 +246,10 @@ fn write_make4ht_config(path: &Path) -> Result<()> {
 
 \Configure{CutAt}{}
 
+% TeX4ht sometimes references this internal section-title macro
+% after ignoring appendix sections.
+\expandafter\def\csname ssect:ttl\endcsname{}
+
 % Common paper macros that may be undefined under htlatex.
 \providecommand{\etal}{et al.}
 \providecommand{\eg}{e.g.}
