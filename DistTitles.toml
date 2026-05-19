@@ -1,3 +1,4 @@
 # うまく論文タイトルをインデックスにできないときに，ここで手動マッピングを行う．
 [titles]
 "arXiv-1812.00535v3" = "Beyond Inferring Class Representatives: User-Level Privacy Leakage From Federated Learning"
+"arXiv-2209.05578v1" = "Cocktail Party Attack: Breaking Aggregation-Based Privacy in Federated Learning using Independent Component Analysis"
