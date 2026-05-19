@@ -1,0 +1,782 @@
+<!DOCTYPE html> 
+<html lang='en-US' xml:lang='en-US'> 
+<head> <title></title> 
+<meta charset='utf-8' /> 
+<meta content='TeX4ht (https://tug.org/tex4ht/)' name='generator' /> 
+<meta content='width=device-width,initial-scale=1' name='viewport' /> 
+<link href='main.css' rel='stylesheet' type='text/css' /> 
+<meta content='main.tex' name='src' /> 
+<script>window.MathJax = { tex: { tags: "ams", }, }; </script> 
+<script async='async' id='MathJax-script' src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js' type='text/javascript'></script>  
+</head><body>
+<!-- l. 93 --><p class='noindent'>
+                                                                                                  
+                                                                                                  
+</p><!-- l. 93 --><p class='indent'>
+                                                                                                  
+                                                                                                  
+</p><!-- l. 93 --><p class='noindent'><span class='ptmr7t-x-x-200'>Cocktail Party Attack: Breaking Aggregation-Based Privacy in
+Federated Learning using Independent Component Analysis</span>
+</p><!-- l. 93 --><p class='noindent'>
+</p><!-- l. 93 --><p class='noindent'>                                  <span class='ptmr7t-x-x-110'>Sanjay Kariyappa</span><span class='mathjax-inline'>\(^\dag \)
+                             </span><span class='ptmri7t-'>Georgia Institute of Technology</span>
+                               sanjaykariyappa@gatech.edu                                 <span class='ptmr7t-x-x-110'>Chuan Guo
+                                                                                        </span><span class='ptmri7t-'>Meta AI</span>
+                                                                                    chuanguo@fb.com
+      <span class='ptmr7t-x-x-110'>Kiwan Maeng</span><span class='mathjax-inline'>\(^\dag \)
+</span><span class='ptmri7t-'>Pennsylvania State University</span>
+     kvm6242@psu.edu                                                               <span class='ptmr7t-x-x-110'>Wenjie Xiong
+                                                                               </span><span class='ptmri7t-'>Meta AI / Virginia Tech</span>
+                                                                                  wenjiex@fb.com
+</p><!-- l. 93 --><p class='noindent'>                                                                                <span class='ptmr7t-x-x-110'>G. Edward Suh
+                                                                           </span><span class='ptmri7t-'>Meta AI / Cornell University</span>
+                                                                                 edsuh@fb.com
+   <span class='ptmr7t-x-x-110'>Moinuddin K Qureshi
+</span><span class='ptmri7t-'>Georgia Institute of Technology</span>
+      moin@gatech.edu                                                               <span class='ptmr7t-x-x-110'>Hsien-Hsin S. Lee</span><span class='mathjax-inline'>\(^\dag \)</span>
+                                                                                  lee.sean@gmail.com
+</p><!-- l. 93 --><p class='indent'>  <span class='ptmr8c-'>*</span><span class='mathjax-inline'>\(\protect \dag  \)</span>work was done while the authors were at FAIR/Meta AI.
+</p><!-- l. 94 --><p class='noindent'><span class='ptmb7t-x-x-90'>Abstract
+       </span><span class='ptmr7t-x-x-90'>Federated learning (FL) aims to perform privacy-preserving machine learning on distributed data held by multiple data owners.
+    To this end, FL requires the data owners to perform training locally and share the gradient updates (instead of the private inputs)
+    with  the  central  server,  which  are  then  securely  aggregated  over  multiple  data  owners.  Although  aggregation  by  itself  does  not
+    provably  offer  privacy  protection,  prior  work  showed  that  it  may  suffice  if  the  batch  size  is  sufficiently  large.  In  this  paper,
+    we  propose  the  Cocktail  Party  Attack  (CPA)  that,  contrary  to  prior  belief,  is  able  to  recover  the  private  inputs  from  gradients
+    aggregated over a very large batch size. CPA leverages the crucial insight that aggregate gradients from a fully connected layer
+    is  a  linear  combination  of  its  inputs,  which  leads  us  to  frame  gradient  inversion  as  a  blind  source  separation  (BSS)  problem
+    (informally  called  the  cocktail  party  problem).  We  adapt  independent  component  analysis  (ICA)—a  classic  solution  to  the  BSS
+    problem—to recover private inputs for fully-connected and convolutional networks, and show that CPA significantly outperforms
+    prior gradient inversion attacks, scales to ImageNet-sized inputs, and works on large batch sizes of up to 1024.</span>
+</p><!-- l. 99 --><p class='noindent'><span class='ptmb7t-x-x-90'>Index  Terms
+       </span><span class='ptmr7t-x-x-90'>Federated Learning, gradient inversion</span>
+</p><!-- l. 1 --><p class='indent' id='iintroduction'>  
+<a id='x1-2r1'></a>
+<span class='ptmrc7t-'>I.  I<span class='small-caps'>ntroduction</span></span>
+<a id='Q1-1-0'></a>
+</p><!-- l. 3 --><p class='indent'>  Federated learning (FL) <span class='cite'> [<a href='#Xmcmahan2017communication'>16</a>]</span> is a powerful and flexible framework for privacy-preserving machine learning (ML) model
+training on distributed data. The FL framework typically consists of a central server and multiple clients that hold private
+training data. The protocol involves the server distributing the model parameters <span class='mathjax-inline'>\(\theta \)</span> to the clients, and then the clients
+using this model to compute gradient update <span class='mathjax-inline'>\(\nabla _\theta \mathcal L\)</span> using their private data. The gradient updates are aggregated and shared
+with the server who updates its model parameters using the aggregated gradients and this process is repeated until
+convergence.
+</p>
+  <hr class='figure' /><div class='figure' id='a-cocktail-party-attack-cpa-is-based-on-the-insight-that-aggregate-gradients-from-fc-layers-are-linear-combinations-of-its-inputs-b-cpa-uses-this-insight-to-frame-gradient-inversion-as-a-blind-source-separation-problem-and-recovers-the-inputs-from-the-gradients-by-optimizing-an-unmixing-matrix-u-using-independent-component-analysis'>
+                                                                                                  
+                                                                                                  
+                                                                                                  
+                                                                                                  
+<div class='centerline'>                                                <img alt='PIC' height='516' src='figs/motivation-.png' width='516' />                                               </div>
+<a id='x1-3r1'></a>
+<span class='ptmr7t-x-x-80'>Fig. 1.  (a) Cocktail party attack (CPA) is based on the insight that aggregate gradients from FC layers are linear combinations of its inputs. (b) CPA uses
+this insight to frame gradient inversion as a blind source separation problem and recovers the inputs from the gradients by optimizing an unmixing matrix </span><span class='mathjax-inline'>\(U\)
+</span><span class='ptmr7t-x-x-80'>using independent component analysis.</span>
+                                                                                                  
+                                                                                                  
+  </div><hr class='endfigure' />
+<!-- l. 22 --><p class='indent'>  While FL avoids the direct sharing of data, this in itself does not guarantee privacy as the gradient update shared with the server can
+contain information about the private training data <span class='cite'> [<a href='#Xnasr2019comprehensive'>17</a>]</span>. For instance, Zhu et al. <span class='cite'> [<a href='#Xdlg'>26</a>]</span> showed concretely that these gradient updates
+can be <span class='ptmri7t-'>inverted </span>to recover their associated private data in a process now called <span class='ptmri7t-'>gradient inversion</span>. In realistic settings, however,
+gradient inversion in FL is considered to be hard <span class='cite'> [<a href='#Xdlg'>26</a>]</span>, as gradients are aggregated across a large number of inputs (e.g., 1024), which
+thwarts most existing gradient inversion attacks.
+</p><!-- l. 32 --><p class='indent'>  The central goal of our paper is to show that this hardness is not an inherent privacy property of FL, but rather a technical limitation
+of the existing attack algorithms. To this end, we propose the <span class='ptmri7t-'>Cocktail Party Attack (CPA)</span>—a gradient inversion attack that is able to
+faithfully recover the inputs to a fully-connected (FC) layer from its aggregated gradient. This is made possible by a novel
+insight that the aggregated gradient for an FC layer is a linear combination of its inputs, which allows us to frame the
+recovery of these inputs as a <span class='ptmri7t-'>blind source separation </span>(BSS) problem and solve it using independent component analysis
+(ICA).
+</p><!-- l. 36 --><p class='indent'>  When applied to a fully-connected network (or any network where the first layer is an FC layer), CPA can readily perform gradient
+inversion to recover input images. Fig. <a href='#a-cocktail-party-attack-cpa-is-based-on-the-insight-that-aggregate-gradients-from-fc-layers-are-linear-combinations-of-its-inputs-b-cpa-uses-this-insight-to-frame-gradient-inversion-as-a-blind-source-separation-problem-and-recovers-the-inputs-from-the-gradients-by-optimizing-an-unmixing-matrix-u-using-independent-component-analysis'>1<!-- tex4ht:ref: fig:summary  --></a> shows an illustration of CPA on a fully-connected network, where a batch of training images
+is faithfully recovered from its aggregated gradient. We further extend CPA to perform gradient inversion on convolutional networks by
+first recovering the per-sample embeddings to an FC layer of the network and then inverting these embeddings using feature
+inversion to recover the input images. Empirically, we show that CPA has the following advantages over prior work:
+</p>
+  <ul class='itemize1'>
+  <li class='itemize'>We evaluate CPA by inverting the gradients from a FC network trained on CIFAR-10 <span class='cite'> [<a href='#Xcifar10'>13</a>]</span> and Tiny-Imagenet <span class='cite'> [<a href='#Xle2015tiny'>14</a>]</span>, and
+  a VGG-16 network <span class='cite'> [<a href='#Xsimonyan2014very'>19</a>]</span> trained on ImageNet to show that our attack can perform high-quality recovery of private inputs
+  even with batch size as large as 1024.
+  </li>
+  <li class='itemize'>Compared to prior work based on gradient matching <span class='cite'> [<a href='#Xdlg'>26</a>]</span>, CPA can recover inputs with better quality and scales to datasets
+  with larger input sizes (e.g., ImageNet). Furthermore, we show that gradient matching can be combined with CPA to further
+  improve attack performance.
+  </li>
+  <li class='itemize'>CPA  only  uses  simple  image  priors  such  as  smoothness  and  does  not  require  knowledge  of  the  input  data  distribution  or
+  changes to the model parameters, and hence is more versatile and applicable to real world settings.</li></ul>
+<!-- l. 45 --><p class='noindent'>The efficacy of CPA shows that aggregation alone does not provide meaningful privacy guarantees and defenses like differential privacy
+are truly necessary to prevent gradients from leaking private data in FL.
+</p><!-- l. 5 --><p class='indent' id='iibgradient-inversion-attack'>  
+<a id='x1-4r2'></a>
+<span class='ptmrc7t-'>II.  B<span class='small-caps'>ackground</span></span>
+<a id='Q1-1-1'></a>
+</p><!-- l. 6 --><p class='indent'>  In this section, we provide background on FL and gradient inversion attacks (GIA). We also provide an overview of prior works on
+GIA and describe their limitations.
+</p><!-- l. 8 --><p class='indent' id='iibgradient-inversion-attack'>  
+<a id='x1-5r1'></a>
+  <span class='ptmri7t-'>A.  Federated Learning</span>
+<a id='Q1-1-1'></a>
+</p><!-- l. 9 --><p class='indent'>  FL aims to train a model on distributed data held by multiple clients in a privacy-preserving manner. FL involves a central server and
+multiple clients who hold private data <span class='mathjax-inline'>\(X\)</span> as shown in Fig. <a href='#_'>2<!-- tex4ht:ref: fig:fl_gm  --></a>a. To train a model <span class='mathjax-inline'>\(f_\theta \)</span>, the server starts by distributing the model to the clients.
+The client uses the batch of private data to compute the aggregate gradients of the loss with respect to the model parameters <span class='mathjax-inline'>\(\theta \)</span> and sends
+the gradient <span class='mathjax-inline'>\(\nabla _\theta \mathcal L\)</span> to the central server. The server collects and aggregates the gradients, and uses the aggregated gradient to update the
+model parameters. To improve privacy, some proposals use secure aggregation <span class='cite'> [<a href='#Xsecure_aggregation'>3</a>]</span>. This process is repeated until the model
+converges.
+</p><!-- l. 13 --><p class='indent' id='iibgradient-inversion-attack'>  
+<a id='x1-6r2'></a>
+  <span class='ptmri7t-'>B.  Gradient Inversion Attack</span>
+<a id='Q1-1-1'></a>
+                                                                                                  
+                                                                                                  
+</p><!-- l. 15 --><p class='indent'>  The goal of a gradient inversion attack is to recover the inputs from the aggregate gradients produced during training. Such attacks
+can be used by a malicious server to leak the private inputs of the clients in FL.
+</p><!-- l. 17 --><p class='indent'>  <span class='ptmb7t-'>Attack Objective: </span>Let <span class='mathjax-inline'>\(\mathcal {A}\)</span> denote the gradient inversion attack. The goal of the attack is to estimate the batch of inputs <span class='mathjax-inline'>\(\hat {X}\)</span> from the
+aggregate gradient <span class='mathjax-inline'>\(\nabla _\theta \mathcal L(S, Y)\)</span>, such that the estimated inputs <span class='mathjax-inline'>\(\hat {X}\)</span> are semantically similar to the original inputs <span class='mathjax-inline'>\(X\)</span> as shown in Eqn. <a href='#x1-7r1'>1<!-- tex4ht:ref: eq:attack  --></a>.
+</p><div class='mathjax-env mathjax-align'>\begin{align} \label {eq:attack} \min d(\hat {X}, X), \text {where }\hat {X} = \mathcal {A}(\nabla _\theta \mathcal L(X, Y)) \end{align}</div>
+<p><a id='x1-7r1'></a>
+<!-- l. 21 --></p><p class='indent'>  <span class='ptmb7t-'>Attack Constraints: </span>We assume an honest-but-curious adversary, meaning that the central server is not allowed to modify the FL
+protocol or insert malicious weights <span class='cite'> [<a href='#Xcurious'>2</a>, <a href='#Xrob'>6</a>]</span> to achieve the attack objective.
+</p>
+  <hr class='figure' /><div class='figure' id='_'>
+                                                                                                  
+                                                                                                  
+                                                                                                  
+                                                                                                  
+<div class='centerline'>                                                <img alt='PIC' height='516' src='figs/fl_gm-.png' width='516' />                                               </div>
+<a id='x1-8r2'></a>
+<span class='ptmr7t-x-x-80'>Fig. 2.  (a) FL aims to perform privacy preserving ML on distributed data by requiring the clients to perform training locally on their private data </span><span class='mathjax-inline'>\(X\) </span><span class='ptmr7t-x-x-80'>and send
+the weight updates/gradients </span><span class='mathjax-inline'>\(\nabla _\theta \mathcal L\) </span><span class='ptmr7t-x-x-80'>to a central server. (b) Gradient inversion attacks (GIA) break privacy by recovering the private data from the gradients. Prior
+works carry out GIA by optimizing a set of dummy parameters (</span><span class='mathjax-inline'>\(x^*, y^*\)</span><span class='ptmr7t-x-x-80'>) with the objective of matching the gradient obtained during FL.</span><span class='footnote-mark'><a href='#fn2x0' id='fn2x0-bk'><sup class='textsuperscript'>2</sup></a></span>
+                                                                                                  
+                                                                                                  
+  </div><hr class='endfigure' />
+<!-- l. 30 --><p class='indent'>  <a id='x1-9f2'></a>
+<a id='x1-11r3'></a>
+</p><!-- l. 31 --><p class='noindent' id='iidchallenges-for-scaling-to-large-input-sizes'><span class='ptmri7t-'>C.  Related Work</span>
+<a id='Q1-1-2'></a>
+</p><!-- l. 32 --><p class='indent'>  Most prior works on gradient inversion primarily rely on the <span class='ptmri7t-'>gradient matching </span>objective to carry out the attack.
+We start by describing gradient matching, followed by attacks that build on this objective using various input priors
+like total variation prior, batch-norm statistics, and generative image priors to improve attack performance. We also
+discuss a recent line of work that uses malicious model parameters to carry out GIA. We describe the limitations of
+these prior works and also discuss the key challenge in scaling gradient matching based attacks to datasets with large
+inputs.
+</p><!-- l. 34 --><p class='indent'>  <span class='ptmb7t-'>Gradient Matching: </span>Gradient matching <span class='cite'> [<a href='#Xdlg'>26</a>]</span> performs gradient inversion by optimizing a batch of dummy inputs and labels <span class='mathjax-inline'>\((x^*, y^*)\)</span> to
+produce a gradient that matches the one received by the server during FL as shown in Fig. <a href='#_'>2<!-- tex4ht:ref: fig:fl_gm  --></a>b. This can be done by
+minimizing the distance between the gradient produced by the dummy variables <span class='mathjax-inline'>\(\mathcal L_\theta (x^*, y^*)\)</span> and the gradient received during FL <span class='mathjax-inline'>\(\mathcal L_\theta (x, y)\)</span> as
+shown in Eqn. <a href='#x1-12r2'>2<!-- tex4ht:ref: eq:gm  --></a>. This method was shown to work well on small datasets like CIFAR-10 <span class='cite'> [<a href='#Xcifar10'>13</a>]</span> up to a batch size of 8.
+</p><div class='mathjax-env mathjax-align'>\begin{align} \label {eq:gm} \hat {x}, \hat {y} = \argmin _{x^*, y^*}d(\mathcal L_\theta (x^*, y^*), \mathcal L_\theta (x, y)) \end{align}</div>
+<p><a id='x1-12r2'></a>
+<!-- l. 39 --></p><p class='indent'>  Here, <span class='mathjax-inline'>\(d\)</span> denotes a distance metric between vectors like cosine similarity or <span class='mathjax-inline'>\(L_2\)</span> norm. A subsequent work <span class='cite'> [<a href='#Xidlg'>25</a>]</span> proposed a method to
+infer the ground truth labels by examining the gradients of the last layer. Knowing the labels can help improve the quality of gradient
+inversion. However, this method only works when no two inputs in the batch belong to the same output class, limiting its
+applicability.
+</p><!-- l. 46 --><p class='indent'>  <span class='ptmb7t-'>Total Variation (TV) Prior: </span>Geiping et al. <span class='cite'> [<a href='#Xgeiping'>7</a>]</span> proposed to use the TV prior <span class='cite'> [<a href='#Xtv'>18</a>]</span> as a regularization term along with the gradient
+matching objective. The TV prior (Eqn. <a href='#x1-13r3'>3<!-- tex4ht:ref: eq:tv  --></a>) penalizes high-frequency components in the input and encourages the optimization to find
+natural-looking images. With the TV prior, gradient matching can be scaled to work on a batch size of up to 100 for CIFAR-10 images
+and up to a small number of inputs for ImageNet. </p><div class='mathjax-env mathjax-align'>\begin{align}\label {eq:tv} \mathcal {R}_{TV}(x^*) = \mathbb E\big [|x^*_{i+1,j} - x^*_{ij}|\big ] + \mathbb E\big [|x^*_{i,j+1} - x^*_{ij}|\big ] \end{align}</div>
+<p><a id='x1-13r3'></a>
+<!-- l. 56 --></p><p class='indent'>  <span class='ptmb7t-'>Batch Norm Statistics: </span>Several works <span class='cite'> [<a href='#Xyin2021see'>22</a>, <a href='#Xgradvit'>8</a>]</span> have proposed to use the mean and variance of the activations captured by the batch
+norm (BN) layers as a prior to improve gradient inversion using the regularization term in Eqn. <a href='#x1-14r4'>4<!-- tex4ht:ref: eq:bn  --></a>. Here, <span class='mathjax-inline'>\(\mu _l(x^*)\)</span> and <span class='mathjax-inline'>\(\sigma ^2_l(x^*)\)</span> represent the mean
+and variance of the activation produced by the input <span class='mathjax-inline'>\(x^*\)</span> at the <span class='mathjax-inline'>\(l\)</span>-th BN layer. This regularization term encourages the
+optimization to find inputs that produce activations whose distribution matches the BN statistics. Evaluations from
+this work show that the BN prior can enable gradient inversion on ImageNet with a batch size of up to 48 examples.
+</p><div class='mathjax-env mathjax-align'>\begin{align} \begin {split}\label {eq:bn} \mathcal R_{BN}(x^*) = \mathbb {E}_l \Big [||\mu _l(x^*) - BN_l(mean)||_2 \\+ ||\sigma ^2_l(x^*) - BN_l(var)||_2\Big ] \end {split} \end{align}</div>
+<p><a id='x1-14r4'></a>
+<!-- l. 63 --></p><p class='indent'>  A key limitation of this work is that it can only be used for models that use BN layers. In a real-world FL, the model might not
+contain BN layers because BN layers often degrades accuracy with a non-IID data <span class='cite'> [<a href='#Xniid_quagmire'>9</a>]</span>, which is common in FL <span class='cite'> [<a href='#Xfl_challenges'>15</a>]</span>. Furthermore,
+BN statistics can be used to perform model inversion to leak the training data directly from the model parameters <span class='cite'> [<a href='#Xdreaming'>23</a>]</span>
+(without the need for gradients), posing a concern about the premise of using networks with BN layers to train on private
+data.
+</p><!-- l. 70 --><p class='indent'>  <span class='ptmb7t-'>Generative Image Prior: </span>Instead of performing optimization in the space of inputs, a recent work <span class='cite'> [<a href='#Xgip1'>11</a>]</span> proposes to move the
+optimization to the smaller latent space of a generative model (G) to find an input <span class='mathjax-inline'>\(x^*=G(z^*)\)</span> that satisfies the gradient matching objective as
+shown in Eqn. <a href='#x1-15r5'>5<!-- tex4ht:ref: eq:gip  --></a>. The reduced space of optimization and the prior induced by the generative model helps the attack scale to
+imagenet-scale datasets with a small batch size. </p><div class='mathjax-env mathjax-align'>\begin{align} \label {eq:gip} \hat {z}, \hat {y} &amp;= \argmin _{z^*\in \mathbb {R}^k, y^*}d(\mathcal L_\theta (G(z^*), y^*), \mathcal L_\theta (x, y)) \end{align}</div>
+<p><a id='x1-15r5'></a>
+<!-- l. 74 --></p><p class='indent'>  Note that this method requires the adversary to have access to in-distribution data or a generative model that is trained on
+in-distribution data. This may not be realistic in several settings (e.g. medicine and finance), where in-distribution data/generative model
+may not be available. Additionally, such methods may not work well under dataset shift.
+</p><!-- l. 76 --><p class='indent'>  <span class='ptmb7t-'>Malicious Parameters: </span>Several recent works <span class='cite'> [<a href='#Xcurious'>2</a>, <a href='#Xrob'>6</a>, <a href='#Xwen2022fishing'>20</a>]</span> have proposed methods to leak private inputs by using malicious model
+parameters under the assumption of a dishonest central server. Such methods use weights that cause the aggregate gradient or the
+difference between two aggregate gradients to be predominantly influenced by a single input. However, under our threat model of an
+honest central server, malicious modifications to model parameters are not allowed. Thus, we do not consider such attacks in our
+work.
+</p><!-- l. 78 --><p class='indent' id='iidchallenges-for-scaling-to-large-input-sizes'>  
+<a id='x1-16r4'></a>
+  <span class='ptmri7t-'>D.  Challenges for Scaling to Large Input Sizes</span>
+<a id='Q1-1-2'></a>
+                                                                                                  
+                                                                                                  
+</p><!-- l. 79 --><p class='indent'>  The optimization complexity of gradient matching poses a fundamental limitation to the scalability of prior works to datasets with
+large inputs. Most prior works (with the exception of generative image prior) perform optimization directly in the input-space. The size
+of this optimization problem is <span class='mathjax-inline'>\(\mathcal {O}(n \times d_{in})\)</span>, where <span class='mathjax-inline'>\(n\)</span> is the batch size and <span class='mathjax-inline'>\(d_{in}\)</span> denotes the dimensionality of the input. The difficulty of performing this
+optimization scales linearly with the dimensionality of the input, preventing gradient-matching based from scaling to high-dimensional
+inputs.
+</p><!-- l. 81 --><p class='indent'>  In contrast, our proposed attack (CPA) has an optimization complexity <span class='mathjax-inline'>\(\mathcal {O}(n \times n\)</span>), which is independent of the input-dimensionality. This
+unique feature keeps the size of the optimization problem low and enables CPA to scale to ImageNet-sized datasets even with large
+batch sizes.
+                                                                                                  
+                                                                                                  
+</p><!-- l. 1 --><p class='indent'>  </p><hr class='float' /><div class='float' id='the-microphone-recordings-in-the-cocktail-party-problem-and-the-gradients-from-a-fully-connected-layer-can-both-be-represented-as-linear-combination-of-inputs-recovering-the-inputs-in-both-cases-can-be-viewed-as-a-blind-source-separation-problem'>
+                                                                                                  
+                                                                                                  
+<div class='centerline'>                                                <img alt='PIC' height='516' src='figs/cocktail_party-.png' width='516' />                                               </div>
+<a id='x1-17r3'></a>
+<span class='ptmr7t-x-x-80'>Fig. 3.  The microphone recordings in the cocktail party problem and the gradients from a fully connected layer can both be represented as linear combination
+of inputs. Recovering the inputs in both cases can be viewed as a blind source separation problem.</span>
+                                                                                                  
+                                                                                                  
+  </div><hr class='endfloat' />
+<!-- l. 7 --><p class='indent' id='ivextending-cocktail-party-attack-to-cnns'>  
+<a id='x1-18r3'></a>
+<span class='ptmrc7t-'>III.  C<span class='small-caps'>ocktail</span> P<span class='small-caps'>arty</span> A<span class='small-caps'>ttack</span></span>
+<a id='Q1-1-3'></a>
+</p><!-- l. 8 --><p class='indent'>  Our paper proposes CPA – a gradient-inversion attack specifically for FC layers. CPA frames gradient inversion as a BSS problem
+and uses ICA to recover the private inputs from aggregate gradients. We start by providing background on the BSS problem and
+describe how gradient inversion in FC layers can be viewed as a BSS problem. Next, we describe ICA–a classic signal processing
+technique– that can be used to solve the the BSS problem. Lastly, we consider the problem of performing gradient inversion for FC
+models trained on image data, and describe how CPA can be used directly with simple image prior to perform gradient
+inversion and leak the private inputs. While FC models are typically not used for image classification, it represents
+the simplest setting to describe our attack. In the next section, we extend our attack to work on more realistic CNN
+models.
+</p><!-- l. 10 --><p class='indent' id='ivextending-cocktail-party-attack-to-cnns'>  
+<a id='x1-19r1'></a>
+  <span class='ptmri7t-'>A.  Framing Gradient Inversion as a Blind Source Separation Problem</span>
+<a id='Q1-1-3'></a>
+</p><!-- l. 12 --><p class='indent'>  CPA frames gradient inversion as a BSS problem. We explain the BSS problem using the motivating example of the cocktail party
+problem and show that gradient inversion for an FC layer can also be viewed as a BSS problem.
+</p><!-- l. 14 --><p class='indent'>  <span class='ptmb7t-'>Cocktail Party Problem: </span>Consider a cocktail party where there are a group of four people talking simultaneously as depicted in
+Fig. <a href='#the-microphone-recordings-in-the-cocktail-party-problem-and-the-gradients-from-a-fully-connected-layer-can-both-be-represented-as-linear-combination-of-inputs-recovering-the-inputs-in-both-cases-can-be-viewed-as-a-blind-source-separation-problem'>3<!-- tex4ht:ref: fig:cocktail_party  --></a>a. A microphone placed near this group picks up an audio recording consisting of an overlapping set of voices from the four
+speakers. We can model this recording by viewing it as a linear combination of the voices of the four speakers. More formally, if <span class='mathjax-inline'>\(\vec {x}_0, \vec {x}_1, \vec {x}_2, \vec {x}_3\)</span>
+denote the speech vectors of the four speakers and <span class='mathjax-inline'>\(\vec {g}_0, \vec {g}_1, \vec {g}_2, \vec {g}_3\)</span> denotes the recordings of four microphones places at different points, the recording
+of the <span class='mathjax-inline'>\(i\)</span>-th microphone is given by: </p><div class='mathjax-env mathjax-align'>\begin{align} \label {eq:cp_equations} \vec {g}_i = a_{i0} \vec {x}_0 + a_{i1} \vec {x}_1 + a_{i2} \vec {x}_2 + a_{i3} \vec {x}_3 \end{align}</div>
+<p><a id='x1-20r6'></a>
+<!-- l. 18 --></p><p class='indent'>  Here, <span class='mathjax-inline'>\(a_{ij}\)</span> denote the unknown mixing coefficients. The BSS problem can be stated as follows: given the mixed signals <span class='mathjax-inline'>\(\{\vec {g}_i\}\)</span>, recover the
+individual source signals <span class='mathjax-inline'>\(\{\vec {x}_i\}\)</span>.
+</p><!-- l. 23 --><p class='indent'>  <span class='ptmb7t-'>Gradient Inversion for FC Layer: </span>Much like the cocktail party problem, the aggregate gradients from an FC layer can be viewed
+as linear combinations of the inputs used to generate them. To demonstrate this, consider an FC layer with four hidden neurons <span class='mathjax-inline'>\(y_0, y_1, y_2, y_3\)</span> as
+shown in Fig. <a href='#the-microphone-recordings-in-the-cocktail-party-problem-and-the-gradients-from-a-fully-connected-layer-can-both-be-represented-as-linear-combination-of-inputs-recovering-the-inputs-in-both-cases-can-be-viewed-as-a-blind-source-separation-problem'>3<!-- tex4ht:ref: fig:cocktail_party  --></a>b. Let <span class='mathjax-inline'>\(\vec {w}_0, \vec {w}_1, \vec {w}_2, \vec {w}_3\)</span> represent the weight vectors associated with each output neuron. Let <span class='mathjax-inline'>\(\vec {x}_0, \vec {x}_1, \vec {x}_2, \vec {x}_3\)</span> be a batch of four inputs used to perform
+a single iteration of training. <span class='mathjax-inline'>\(\vec {g}_i = \nabla _{w_i}\mathcal L\)</span> is the aggregate gradient of the loss with respect to <span class='mathjax-inline'>\(\vec {w}_i\)</span>, which is computed by taking the mean of the
+individual gradients <span class='mathjax-inline'>\(\nabla _{w_i}\mathcal L^j\)</span> associated with each input <span class='mathjax-inline'>\(\vec {x}_j\)</span>. This aggregate gradient <span class='mathjax-inline'>\(\vec {g}_i\)</span> can further be expressed as a linear combination of the inputs
+<span class='mathjax-inline'>\(\vec {x}_j\)</span> as follows: </p><div class='mathjax-env mathjax-align'>\begin{align} \vec {g}_i &amp;= \frac {1}{4}\sum _j\nabla _{w_0}\mathcal L^j = \frac {1}{4}\sum _j \frac {\partial \mathcal L}{\partial y^j_i} \frac {\partial y^j_i}{\partial w_i} = \frac {1}{4}\sum _j \frac {\partial \mathcal L}{\partial y^j_i}\vec {x}_j \label {eq:gradient_linear_combination} \end{align}</div>
+<p><a id='x1-21r7'></a>
+<!-- l. 31 --></p><p class='indent'>  Notice that the aggregate gradients here have a 1-to-1 correspondence with the cocktail party problem. The inputs here are similar to
+the speakers and gradients are similar to the recordings of the microphones. Recovering the inputs <span class='mathjax-inline'>\(\{\vec {x}_i\}\)</span> (source signals) from a set of
+aggregate gradients <span class='mathjax-inline'>\(\{\vec {g}_i\}\)</span> (mixed signals) can thus be viewed as a BSS problem.
+</p><!-- l. 33 --><p class='indent'>  <span class='ptmb7t-'>Solving BSS with an Unmixing Matrix: </span>Eqn. <a href='#x1-21r7'>7<!-- tex4ht:ref: eq:gradient_linear_combination  --></a> can be expressed as a matrix multiplicaion operation as follows: <span class='mathjax-inline'>\(G = AX\)</span>. The rows of <span class='mathjax-inline'>\(X\in \mathbb R^{n\times d}\)</span>
+denote the inputs (source signals), rows of the <span class='mathjax-inline'>\(A\in \mathbb R^{n\times n}\)</span> represent the coefficients of linear combination and rows of the <span class='mathjax-inline'>\(G\in \mathbb R^{n\times d}\)</span> denote the gradients
+(aggregate signals). We can estimate the source matrix <span class='mathjax-inline'>\(\hat {X}\)</span> from <span class='mathjax-inline'>\(G\)</span> by using an <span class='ptmri7t-'>unmixing matrix </span><span class='mathjax-inline'>\(U\)</span> as follows: <span class='mathjax-inline'>\(\hat {X} = UG\)</span>. Each row of <span class='mathjax-inline'>\(\hat {X}\)</span> represents a
+single recovered source signal <span class='mathjax-inline'>\(\hat {x}_i\)</span>. Note that <span class='mathjax-inline'>\(X\)</span> can be recovered perfectly if <span class='mathjax-inline'>\(U=A^{-1}\)</span> i.e. <span class='mathjax-inline'>\(\hat {X}\rightarrow X\)</span> as <span class='mathjax-inline'>\(U\rightarrow A^{-1}\)</span>. Estimating <span class='mathjax-inline'>\(\hat {X}\)</span> can thus be reduced to finding the
+unmixing matrix <span class='mathjax-inline'>\(U\)</span>.
+</p><!-- l. 35 --><p class='indent' id='ivextending-cocktail-party-attack-to-cnns'>  
+<a id='x1-22r2'></a>
+  <span class='ptmri7t-'>B.  Gradient Inversion using ICA</span>
+<a id='Q1-1-3'></a>
+</p><!-- l. 36 --><p class='indent'>  Independent component analysis (ICA) is a classic signal processing technique that can be use to solve the BSS problem by
+estimating the unmixing matrix <span class='mathjax-inline'>\(U\)</span>. To do this, ICA starts with a randomly initialized unmixing matrix <span class='mathjax-inline'>\(U^*\)</span> and optimizes it to enforce certain
+properties on the recovered source signals. To explain, let <span class='mathjax-inline'>\(x^*_i=u^*_iG\)</span> denote the <span class='mathjax-inline'>\(i\)</span>-th source signal recovered from multiplying the <span class='mathjax-inline'>\(i\)</span>-th row of <span class='mathjax-inline'>\(U^*\)</span> with
+<span class='mathjax-inline'>\(G\)</span>. Note that the source signals represent images in our case (Fig. <a href='#the-microphone-recordings-in-the-cocktail-party-problem-and-the-gradients-from-a-fully-connected-layer-can-both-be-represented-as-linear-combination-of-inputs-recovering-the-inputs-in-both-cases-can-be-viewed-as-a-blind-source-separation-problem'>3<!-- tex4ht:ref: fig:cocktail_party  --></a>b). ICA optimizes <span class='mathjax-inline'>\(U^*\)</span> so that the recovered source signals <span class='mathjax-inline'>\(\{x^*_i\}\)</span> satisfy the
+following key properties: </p>
+    <ul class='itemize1'>
+    <li class='itemize'>
+                                                                                                  
+                                                                                                  
+    <!-- l. 38 --><p class='noindent'><span class='ptmri7t-'>Non-Gaussianity: </span>Values of real-world signals such as images and speech typically do not follow a Gaussian distribution. We can
+    measure non-Gaussianity using the negentropy metric, which can be estimated using Eqn. <a href='#x1-23r8'>8<!-- tex4ht:ref: eq:negentropy  --></a> <span class='cite'> [<a href='#Xhyvarinen2000independent'>10</a>]</span>. A high value of negentropy
+    indicates a high degree of non-Gaussianity. </p><div class='mathjax-env mathjax-align'>\begin{align}\label {eq:negentropy} J(x^*) = \mathbb E\Big [\frac {1}{a^2}\log \cosh ^2(ax^*_i)\Big ]. \end{align}</div>
+<a id='x1-23r8'></a>
+    </li>
+    <li class='itemize'>
+    <!-- l. 42 --><p class='noindent'><span class='ptmri7t-'>Mutual Independence (MI): </span>We assume that the source signals are independently chosen and thus their values are uncorrelated.
+    Since each row <span class='mathjax-inline'>\(u^*_i\)</span> of the unmixing matrix corresponds to a recovered source signal <span class='mathjax-inline'>\(x^*_i\)</span>, we can enforce MI by minimizing the absolute
+    pairwise cosine similarity between the rows of <span class='mathjax-inline'>\(U^*\)</span>. </p><div class='mathjax-env mathjax-align'>\begin{align}\label {eq:mi} \mathcal R_{MI} = \underset {i\neq j}{\mathbb E} exp\Big (T |CS(u^*_i, u^*_j)|\Big ). \end{align}</div>
+<a id='x1-24r9'></a>
+    </li>
+    <li class='itemize'><span class='ptmri7t-'>Source Prior: </span>Any prior information about the source signals can be included in our optimization in the form of an additional
+    regularization term <span class='mathjax-inline'>\(\mathcal R_P\)</span>.</li></ul>
+<!-- l. 49 --><p class='noindent'>We  find  the  unmixing  matrix  <span class='mathjax-inline'>\(U\)</span>  by  solving  an  optimization  problem  that  combines  the  above
+properties.<span class='footnote-mark'><a href='#fn3x0' id='fn3x0-bk'><sup class='textsuperscript'>3</sup></a></span><a id='x1-25f3'></a><span class='mathjax-inline'>\(^,\)</span><span class='footnote-mark'><a href='#fn4x0' id='fn4x0-bk'><sup class='textsuperscript'>4</sup></a></span><a id='x1-27f4'></a>
+</p><div class='mathjax-env mathjax-align'>\begin{align}\label {eq:ica} \begin {split} U = \argmax _{U^*} \underset {i}{\mathbb E}\Big [J(u^*_iG) - \lambda _{P} \mathcal {R}_{P}(u^*_iG))\Big ] - \lambda _{MI}\mathcal R_{MI} \end {split} \end{align}</div>
+<p><a id='x1-29r10'></a>
+<!-- l. 57 --></p><p class='indent'>  The <span class='mathjax-inline'>\(U\)</span> matrix obtained from solving Eqn. <a href='#x1-29r10'>10<!-- tex4ht:ref: eq:ica  --></a> can be used to estimate the source matrix as follows: <span class='mathjax-inline'>\(\hat {X} = UG\)</span>.
+</p><!-- l. 59 --><p class='indent' id='ivextending-cocktail-party-attack-to-cnns'>  
+<a id='x1-30r3'></a>
+  <span class='ptmri7t-'>C.  CPA for FC Models</span>
+<a id='Q1-1-3'></a>
+</p><!-- l. 60 --><p class='indent'>  For an FC model trained on image data, where the inputs are directly fed to an FC layer, we can recover the inputs directly by
+inverting the gradients of the first FC layer using CPA. Since the source signals are images, we can use TV regularization <span class='mathjax-inline'>\(\mathcal R_{TV}\)</span>
+(Eqn. <a href='#x1-13r3'>3<!-- tex4ht:ref: eq:tv  --></a>)  as  the  source  prior  in  Eqn. <a href='#x1-29r10'>10<!-- tex4ht:ref: eq:ica  --></a>.  One  caveat  of  ICA  is  that  it  does  not  recover  the  sign  of  the  input  (i.e.  <span class='mathjax-inline'>\(\hat {x}_i\)</span>
+can be a sign-inverted version of <span class='mathjax-inline'>\(x_i\)</span>). However, this can be easily resolved by selecting between <span class='mathjax-inline'>\(\hat {x}_i\)</span> and <span class='mathjax-inline'>\(-\hat {x}_i\)</span> through a visual
+comparison.
+<a id='x1-31r4'></a>
+</p><!-- l. 1 --><p class='noindent' id='ivextending-cocktail-party-attack-to-cnns'><span class='ptmrc7t-'>IV.  E<span class='small-caps'>xtending</span> C<span class='small-caps'>ocktail</span> P<span class='small-caps'>arty</span> A<span class='small-caps'>ttack to</span> CNN<span class='small-caps'>s</span></span>
+<a id='Q1-1-3'></a>
+</p><!-- l. 3 --><p class='indent'>  Since our attack is only applicable to FC layers, CPA cannot be used directly on CNN models, where the input is first passed
+through convolutional layers before being fed to a FC layer. However, we can use CPA in composition with a feature inversion attack
+(FIA) to recover the inputs (as shown in Fig. <a href='#we-attack-cnn-models-by-first-recovering-the-private-embedding-from-the-fc-layer-using-cpa-and-then-using-a-feature-inversion-attack-fia-to-recover-the-input-from-these-embeddings'>4<!-- tex4ht:ref: fig:cpa_fi  --></a>) with the following two-step procedure:
+    </p><dl class='enumerate-enumitem'><dt class='enumerate-enumitem'>
+ 1) </dt><dd class='enumerate-enumitem'>Use CPA on the FC layer to recover the embeddings from the gradients.
+    </dd><dt class='enumerate-enumitem'>
+ 2) </dt><dd class='enumerate-enumitem'>Use FIA to estimate the inputs from the embeddings.</dd></dl>
+<!-- l. 8 --><p class='noindent'>We describe these two steps in greater detail below.   </p><hr class='figure' /><div class='figure' id='we-attack-cnn-models-by-first-recovering-the-private-embedding-from-the-fc-layer-using-cpa-and-then-using-a-feature-inversion-attack-fia-to-recover-the-input-from-these-embeddings'>
+<div class='centerline'>                                                <img alt='PIC' height='464' src='figs/cpa_fi-.png' width='464' />                                               </div>
+<a id='x1-34r4'></a>
+<span class='ptmr7t-x-x-80'>Fig. 4.  We attack CNN models by first recovering the private embedding from the FC layer using CPA and then using a feature inversion attack (FIA) to
+recover the input from these embeddings.</span>
+  </div><hr class='endfigure' />
+<!-- l. 31 --><p class='indent' id='ivaleaking-private-embeddings-using-cpa'>  
+<a id='x1-35r1'></a>
+  <span class='ptmri7t-'>A.  Leaking Private Embeddings using CPA</span>
+<a id='Q1-1-4'></a>
+</p><!-- l. 32 --><p class='indent'>  The gradients from the FC layer can be viewed a linear combinations of the embeddings <span class='mathjax-inline'>\(z\)</span> that act as the input to the FC layer. We
+can use CPA to invert the gradients from the FC layer (<span class='mathjax-inline'>\(G\)</span>) and recover an estimate of the embeddings <span class='mathjax-inline'>\(\hat {z}=UG\)</span>. However, we can no longer use
+TV prior in our optimization (Eqn. <a href='#x1-20r6'>6<!-- tex4ht:ref: eq:cp_equations  --></a>) to find <span class='mathjax-inline'>\(U\)</span> since the signal being recovered (<span class='mathjax-inline'>\(z\)</span>) is not an image. Instead, we use the following
+properties of embeddings produced with a ReLU non-linearity to design regularization terms for our optimization:
+</p>
+                                                                                                  
+                                                                                                  
+    <ul class='itemize1'>
+    <li class='itemize'><span class='mathjax-inline'>\(z\)  </span><span class='ptmri7t-'>is  sparse:  </span>Embeddings  produced  by  networks  that  use  ReLU  non-linearity  are  sparse,  as  ReLU  squashes  negative
+    activations to 0. We can use the <span class='mathjax-inline'>\(L_1\)</span>-norm: <span class='mathjax-inline'>\(|z^*|_1\)</span> in our optimization to encourage sparsity of the estimated embeddings.
+    </li>
+    <li class='itemize'><span class='mathjax-inline'>\(z\) </span><span class='ptmri7t-'>is a non-negative vector: </span>Values of the embedding vector are non-negative as ReLU truncates negative inputs to 0. We
+    can minimize the following regularization function <span class='mathjax-inline'>\(\mathcal R_{NN}(z^*)=ReLU(-z^*)\)</span> to encourage <span class='mathjax-inline'>\(z^*\)</span> to be non-negative. However, the embedding recovered
+    by  ICA  can  be  sign  inverted.  In  this  sign-inverted  setting,  the  embedding  can  be  non-positive  vector.  To  allow  for  sign
+    inverted recovery, we propose the <span class='ptmri7t-'>sign regularization </span>(SR) function: <span class='mathjax-inline'>\(\mathcal R_{SR} = \min (ReLU(z^*), ReLU(-z^*))\)</span>. Minimizing <span class='mathjax-inline'>\(\mathcal R_{SR}\)</span> ensures that <span class='mathjax-inline'>\(z^*\)</span> is either non-negative or
+    non-positive.</li></ul>
+<!-- l. 37 --><p class='noindent'>We combine the above regularization terms with the non-Gaussianity and mutual indepencence assumptions to derive the final
+optimization objective to estimate the unmixing matrix <span class='mathjax-inline'>\(U\)</span> as follows: </p><div class='mathjax-env mathjax-align'>\begin{align}\label {eq:ica_cnn} \begin {split} U = \argmax _{U^*}\ &amp;\underset {i}{\mathbb E} \Big [J(u^*_iG) - \lambda _{SP} |u^*_iG|_1 \\ &amp;- \lambda _{SR} \mathcal R_{SR}(u^*_iG)\Big ] - \lambda _{MI}\mathcal R_{MI}. \end {split} \end{align}</div>
+<p><a id='x1-36r11'></a>
+                                                                                                  
+                                                                                                  
+<!-- l. 44 --></p><p class='indent'>  </p><hr class='float' /><div class='float' id='comparison-of-a-subset-of-images-recovered-from-gradient-matching-gm-and-cocktail-party-cp-attacks-by-inverting-the-gradients-from-the-fc2-network-with-a-batch-of-64-tinyimagenet-inputs-the-quality-of-images-recovered-by-cp-is-significantly-better-than-the-gm-attack-please-see-appendixref-appadditionalresults-for-additional-results'>
+                                                                                                  
+                                                                                                  
+<div class='centerline'>                                                <img alt='PIC' height='516' src='figs/results_tiny_imagenet-.png' width='516' />                                               </div>
+<a id='x1-37r5'></a>
+<span class='ptmr7t-x-x-80'>Fig. 5.  Comparison of a subset of images recovered from gradient matching (GM) and cocktail party (CP) attacks by inverting the gradients from the FC-2
+network with a batch of 64 Tiny-ImageNet inputs. The quality of images recovered by CP is significantly better than the GM attack. Please see Appendix </span><a href='#x1-85r1'><span class='ptmr7t-x-x-80'>A</span><!-- tex4ht:ref: app:additional_results  --></a>
+<span class='ptmr7t-x-x-80'>for additional results.</span>
+                                                                                                  
+                                                                                                  
+  </div><hr class='endfloat' />
+<!-- l. 50 --><p class='indent'>  The unmixing matrix can be used to recover the private embeddings <span class='mathjax-inline'>\(\hat {Z}\)</span> from the gradient <span class='mathjax-inline'>\(G\)</span> as follows: <span class='mathjax-inline'>\(\hat {Z}=UG\)</span>. We can use these private
+embeddings to recover the input using a feature inversion attack.
+<a id='x1-38r2'></a>
+</p><!-- l. 51 --><p class='noindent' id='vasetup'><span class='ptmri7t-'>B.  Feature Inversion Attack</span>
+<a id='Q1-1-5'></a>
+</p><!-- l. 52 --><p class='indent'>  FIA inverts the embedding produced by a neural network to recover the input. Formally, given a network <span class='mathjax-inline'>\(f:X\rightarrow Z\)</span>, and an embedding <span class='mathjax-inline'>\(x\)</span>, FIA
+recovers an estimate of the input <span class='mathjax-inline'>\(\hat {x}\)</span> from <span class='mathjax-inline'>\(z\)</span>. We do this by solving the following optimization problem using a dummy input <span class='mathjax-inline'>\(x^*\)</span>:
+</p><div class='mathjax-env mathjax-align'>\begin{align}\label {eq:fi} \begin {split} \hat {x} = \argmax _{x^*} CS(f(x^*), z) - \lambda _{TV}\mathcal {R}_{TV}(x^*) \end {split} \end{align}</div>
+<p><a id='x1-39r12'></a>
+<!-- l. 58 --></p><p class='indent'>  The first term maximizes the cosine similarity between the dummy input <span class='mathjax-inline'>\(z^*=f(x^*)\)</span> and true embedding <span class='mathjax-inline'>\(z\)</span>. The second term is TV
+regularization, which suppresses high-frequency components. Solving this optimization problem allows us to estimate of the private
+inputs <span class='mathjax-inline'>\(\{\hat {x_i}\}\)</span> from the embedding <span class='mathjax-inline'>\(\{\hat {z_i}\}\)</span> recovered by CPA, which completes the gradient inversion attack. Additionally, we can also use
+the gradient information to improve FIA by including the gradient matching objective in the optimization as follows:
+</p><div class='mathjax-env mathjax-align'>\begin{align}\label {eq:fi+gm} \begin {split} \hat {x} = \argmax _{x^*} CS(f(x^*), z) +&amp; \lambda _{GM} CS(\nabla _\theta \mathcal L(x^*), \nabla _\theta \mathcal L(x))\\ - &amp;\lambda _{TV}\mathcal {R}_{TV}(x^*). \end {split} \end{align}</div>
+<p><a id='x1-40r13'></a>
+<!-- l. 1 --></p><p class='indent' id='vasetup'>  
+<a id='x1-41r5'></a>
+<span class='ptmrc7t-'>V.  E<span class='small-caps'>xperiments</span></span>
+<a id='Q1-1-5'></a>
+</p><!-- l. 2 --><p class='indent'>  To demonstrate the efficacy of our attack, we evaluate our proposed attack on FC and CNN models trained on image classification
+tasks. While FC networks are typically not used for image classification, they allow us to demonstrate the efficacy of our attack in its
+simplest form. Our evaluations on the CNN model (VGG-16) demonstrates the utility of our attack in a more realistic problem
+setting.
+</p><!-- l. 4 --><p class='indent' id='vasetup'>  
+<a id='x1-42r1'></a>
+  <span class='ptmri7t-'>A.  Setup</span>
+<a id='Q1-1-5'></a>
+</p><!-- l. 5 --><p class='indent'>  <span class='ptmb7t-'>Model and Datasets: </span>For our experiments on the FC model, we use a simple 2-layer network (FC-2), with the following network
+architecture: <span class='mathjax-inline'>\([Linear(256)-ReLU()-Linear(k)]\)</span> for a <span class='mathjax-inline'>\(k\)</span>-class classification problem. We train FC-2 on the CIFAR-10 <span class='cite'> [<a href='#Xcifar10'>13</a>]</span> and Tiny-ImageNet <span class='cite'> [<a href='#Xle2015tiny'>14</a>]</span> datasets for 20
+epochs using the Adam <span class='cite'> [<a href='#Xadam'>12</a>]</span> optimizer with a learning rate of <span class='mathjax-inline'>\(0.001\)</span>. We perform our CNN experiments with a pre-trained VGG-16
+network <span class='cite'> [<a href='#Xsimonyan2014very'>19</a>]</span> and the ImageNet <span class='cite'> [<a href='#Xdeng2009imagenet'>4</a>]</span> dataset.
+</p><!-- l. 9 --><p class='indent'>  <span class='ptmb7t-'>Evaluation Methodology: </span>We evaluate gradient inversion attacks with the following batch sizes: <span class='mathjax-inline'>\([8, 16, 32, 64, 128, 256]\)</span> for the FC-2 model and <span class='mathjax-inline'>\([32, 64, 128, 256, 512, 1024]\)</span> for
+VGG-16. We perform evaluations by first sampling a batch of inputs <span class='mathjax-inline'>\(\{x_i\}\)</span> from an unseen test set to generate the aggregate gradient <span class='mathjax-inline'>\(\nabla _\theta \mathcal L\)</span>. We
+then use different gradient inversion attacks to recover an estimate of the inputs <span class='mathjax-inline'>\(\{\hat {x}_i\}\)</span> from the aggregate gradients and compare their
+performance. Since our experiments are on image data, we use the LPIPS score <span class='cite'> [<a href='#Xlpips'>24</a>]</span> to quantify the perceptual similarity
+between the original and recovered images, and use this to evaluate the attacks. We repeat the attack on 5 batches of
+data and report the average LPIPS scores in our results. We set the number of optimization rounds for all attacks to
+<span class='mathjax-inline'>\(25000\)</span>.
+</p><!-- l. 11 --><p class='indent'>  <span class='ptmb7t-'>Hyperparameter Tuning: </span>For all the hyperparameters (<span class='mathjax-inline'>\(\lambda _{TV}, \lambda _{MI}, T, \lambda _{SP}, \lambda _{SR}\)</span>), we sweep their values in the range <span class='mathjax-inline'>\([0.00001, 10]\)</span> using a single batch of inputs and pick
+the set of values that yield the best LPIPS score to carry out our attack. Note that the inputs used in the hyperparameter sweep are
+separate from the ones used to report our results.
+                                                                                                  
+                                                                                                  
+</p><!-- l. 12 --><p class='indent'>  </p><hr class='float' /><div class='float' id='comparison-of-a-subset-of-images-recovered-from-gradient-matching-gm-cocktail-party-feature-inversion-cpfi-and-cocktail-party-feature-inversion-gradient-matching-cpfigm-by-inverting-the-gradients-from-a-vgg16-network-with-a-batch-of-256-imagenet-inputs-cpfi-our-proposal-can-recover-more-images-compared-to-gm-prior-work-cpfigm-improves-the-quality-of-recovered-images-by-combining-the-benefits-of-our-proposal-and-prior-work-please-see-appendixref-appadditionalresults-for-additional-results'>
+                                                                                                  
+                                                                                                  
+<div class='centerline'>                                                <img alt='PIC' height='516' src='figs/results_imagenet-.png' width='516' />                                               </div>
+<a id='x1-43r6'></a>
+<span class='ptmr7t-x-x-80'>Fig. 6.  Comparison of a subset of images recovered from gradient matching (GM), cocktail party + feature inversion (CP+FI) and cocktail party + feature
+inversion + gradient matching (CP+FI+GM) by inverting the gradients from a VGG-16 network with a batch of 256 ImageNet inputs. CP+FI (our proposal)
+can recover more images compared to GM (prior work). CP+FI+GM improves the quality of recovered images by combining the benefits of our proposal and
+prior work. Please see Appendix </span><a href='#x1-85r1'><span class='ptmr7t-x-x-80'>A</span><!-- tex4ht:ref: app:additional_results  --></a> <span class='ptmr7t-x-x-80'>for additional results.</span>
+                                                                                                  
+                                                                                                  
+  </div><hr class='endfloat' />
+<!-- l. 18 --><p class='indent'>  <span class='ptmb7t-'>Prior Work for Baseline: </span>Our threat model assumes an honest-but-curious attacker who does not have access to in-distribution
+examples<span class='footnote-mark'><a href='#fn5x0' id='fn5x0-bk'><sup class='textsuperscript'>5</sup></a></span><a id='x1-44f5'></a>. The
+Geiping et al. <span class='cite'> [<a href='#Xgeiping'>7</a>]</span> attack (which uses the gradient matching objective and TV prior) represents the stongest prior work under this
+setting<span class='footnote-mark'><a href='#fn6x0' id='fn6x0-bk'><sup class='textsuperscript'>6</sup></a></span><a id='x1-46f6'></a>.
+We use this prior work (with the best choice of hyperparameters) as the baseline in our evaluations.
+                                                                                                  
+                                                                                                  
+</p><!-- l. 20 --><p class='indent'>  </p><hr class='float' /><div class='float' id='lpips-scores-comparing-the-performance-of-cocktail-party-cp-and-gradient-matching-gm-attacks-on-fc2-trained-on-cifar10-and-tinyimagenet-cp-our-proposal-significantly-outperforms-gm-prior-work-across-all-batch-sizes'>
+                                                                                                  
+                                                                                                  
+<a id='x1-48r1'></a>
+<span class='ptmr7t-x-x-80'>TABLE I</span><br />
+<span class='mathjax-inline'>\(LPIPS\downarrow \) </span><span class='ptmrc7t-x-x-80'><span class='small-caps'>scores comparing the performance of cocktail party</span> (CP) <span class='small-caps'>and gradient matching</span> (GM) <span class='small-caps'>attacks on</span> FC-2 <span class='small-caps'>trained on</span> CIFAR-10 <span class='small-caps'>and</span></span>
+<span class='ptmrc7t-x-x-80'>T<span class='small-caps'>iny</span>-I<span class='small-caps'>mage</span>N<span class='small-caps'>et</span>. CP (<span class='small-caps'>our proposal</span>) <span class='small-caps'>significantly outperforms</span> GM (<span class='small-caps'>prior work</span>) <span class='small-caps'>across all batch sizes</span>.</span>
+ <!-- tex4ht:inline --><div class='tabular'>  
+<table class='tabular' id='TBL-1'><colgroup id='TBL-1-1g'><col id='TBL-1-1' /><col id='TBL-1-2' /><col id='TBL-1-3' /><col id='TBL-1-4' /><col id='TBL-1-5' /><col id='TBL-1-6' /><col id='TBL-1-7' /></colgroup><tr id='TBL-1-1-' style='vertical-align:baseline;'><td class='td11' id='TBL-1-1-1' style='white-space:normal; text-align:center;'> <div class='multicolumn' style='white-space:normal; text-align:center;'><div class='multirow'><!--  rows=0  -->
+<span class='ptmb7t-'>Attack</span></div></div>  </td><td class='td11' colspan='6' id='TBL-1-1-2' style='white-space:normal; text-align:center;'>                  <div class='multicolumn' style='white-space:normal; text-align:center;'><span class='ptmb7t-'>Batch  Size</span></div>
+</td></tr><tr id='TBL-1-2-' style='vertical-align:baseline;'><td class='td11' id='TBL-1-2-1' style='white-space:normal; text-align:center;'>       </td><td class='td11' colspan='6' id='TBL-1-2-2' style='white-space:normal; text-align:center;'></td></tr><tr id='TBL-1-3-' style='vertical-align:baseline;'><td class='td11' id='TBL-1-3-1' style='white-space:normal; text-align:center;'>    <div class='multicolumn' style='white-space:normal; text-align:center;'></div>    </td><td class='td11' id='TBL-1-3-2' style='white-space:normal; text-align:center;'>  8      </td><td class='td11' id='TBL-1-3-3' style='white-space:normal; text-align:center;'>  16     </td><td class='td11' id='TBL-1-3-4' style='white-space:normal; text-align:center;'>  32     </td><td class='td11' id='TBL-1-3-5' style='white-space:normal; text-align:center;'>  64     </td><td class='td11' id='TBL-1-3-6' style='white-space:normal; text-align:center;'>  128    </td><td class='td11' id='TBL-1-3-7' style='white-space:normal; text-align:center;'>  256    </td>
+</tr><tr id='TBL-1-4-' style='vertical-align:baseline;'><td class='td11' id='TBL-1-4-1' style='white-space:normal; text-align:center;'>    <div class='multicolumn' style='white-space:normal; text-align:center;'></div>    </td><td class='td11' colspan='6' id='TBL-1-4-2' style='white-space:normal; text-align:center;'>                   <div class='multicolumn' style='white-space:normal; text-align:center;'><span class='ptmb7t-'>CIFAR-10</span></div>
+</td></tr><tr id='TBL-1-5-' style='vertical-align:baseline;'><td class='td11' id='TBL-1-5-1' style='white-space:normal; text-align:center;'>       </td><td class='td11' colspan='6' id='TBL-1-5-2' style='white-space:normal; text-align:center;'></td></tr><tr id='TBL-1-6-' style='vertical-align:baseline;'><td class='td11' id='TBL-1-6-1' style='white-space:normal; text-align:center;'>  GM      </td><td class='td11' id='TBL-1-6-2' style='white-space:normal; text-align:center;'> 0.283  </td><td class='td11' id='TBL-1-6-3' style='white-space:normal; text-align:center;'> 0.390  </td><td class='td11' id='TBL-1-6-4' style='white-space:normal; text-align:center;'> 0.491  </td><td class='td11' id='TBL-1-6-5' style='white-space:normal; text-align:center;'> 0.569  </td><td class='td11' id='TBL-1-6-6' style='white-space:normal; text-align:center;'> 0.610  </td><td class='td11' id='TBL-1-6-7' style='white-space:normal; text-align:center;'> 0.614  </td></tr><tr id='TBL-1-7-' style='vertical-align:baseline;'><td class='td11' id='TBL-1-7-1' style='white-space:normal; text-align:center;'> CP </td> <td class='td11' id='TBL-1-7-2' style='white-space:normal; text-align:center;'> <span class='ptmb7t-'>0.101 </span></td> <td class='td11' id='TBL-1-7-3' style='white-space:normal; text-align:center;'> <span class='ptmb7t-'>0.160 </span></td> <td class='td11' id='TBL-1-7-4' style='white-space:normal; text-align:center;'> <span class='ptmb7t-'>0.197 </span></td> <td class='td11' id='TBL-1-7-5' style='white-space:normal; text-align:center;'> <span class='ptmb7t-'>0.352 </span></td> <td class='td11' id='TBL-1-7-6' style='white-space:normal; text-align:center;'> <span class='ptmb7t-'>0.521 </span></td> <td class='td11' id='TBL-1-7-7' style='white-space:normal; text-align:center;'> <span class='ptmb7t-'>0.610</span></td>
+
+</tr><tr id='TBL-1-8-' style='vertical-align:baseline;'><td class='td11' id='TBL-1-8-1' style='white-space:normal; text-align:center;'>       </td><td class='td11' colspan='6' id='TBL-1-8-2' style='white-space:normal; text-align:center;'>                 <div class='multicolumn' style='white-space:normal; text-align:center;'><span class='ptmb7t-'>Tiny-ImageNet</span></div>
+</td></tr><tr id='TBL-1-9-' style='vertical-align:baseline;'><td class='td11' id='TBL-1-9-1' style='white-space:normal; text-align:center;'>       </td><td class='td11' colspan='6' id='TBL-1-9-2' style='white-space:normal; text-align:center;'></td></tr><tr id='TBL-1-10-' style='vertical-align:baseline;'><td class='td11' id='TBL-1-10-1' style='white-space:normal; text-align:center;'>  GM      </td><td class='td11' id='TBL-1-10-2' style='white-space:normal; text-align:center;'> 0.182  </td><td class='td11' id='TBL-1-10-3' style='white-space:normal; text-align:center;'> 0.234  </td><td class='td11' id='TBL-1-10-4' style='white-space:normal; text-align:center;'> 0.368  </td><td class='td11' id='TBL-1-10-5' style='white-space:normal; text-align:center;'> 0.620  </td><td class='td11' id='TBL-1-10-6' style='white-space:normal; text-align:center;'> 0.687  </td><td class='td11' id='TBL-1-10-7' style='white-space:normal; text-align:center;'> 0.720  </td></tr><tr id='TBL-1-11-' style='vertical-align:baseline;'><td class='td11' id='TBL-1-11-1' style='white-space:normal; text-align:center;'> CP </td> <td class='td11' id='TBL-1-11-2' style='white-space:normal; text-align:center;'> <span class='ptmb7t-'>0.082 </span></td> <td class='td11' id='TBL-1-11-3' style='white-space:normal; text-align:center;'> <span class='ptmb7t-'>0.143 </span></td> <td class='td11' id='TBL-1-11-4' style='white-space:normal; text-align:center;'> <span class='ptmb7t-'>0.164 </span></td> <td class='td11' id='TBL-1-11-5' style='white-space:normal; text-align:center;'> <span class='ptmb7t-'>0.217 </span></td> <td class='td11' id='TBL-1-11-6' style='white-space:normal; text-align:center;'> <span class='ptmb7t-'>0.232 </span></td> <td class='td11' id='TBL-1-11-7' style='white-space:normal; text-align:center;'> <span class='ptmb7t-'>0.388</span></td>
+</tr></table>                                                                             </div>
+                                                                                                  
+                                                                                                  
+  </div><hr class='endfloat' />
+<!-- l. 45 --><p class='indent' id='vbresults-for-fc2'>  
+<a id='x1-49r2'></a>
+  <span class='ptmri7t-'>B.  Results for FC-2</span>
+<a id='Q1-1-7'></a>
+</p><!-- l. 46 --><p class='indent'>  We first present the results from our experiments on the FC-2 models trained on the CIFAR-10 and Tiny-ImageNet
+datasets. Fig. <a href='#comparison-of-a-subset-of-images-recovered-from-gradient-matching-gm-and-cocktail-party-cp-attacks-by-inverting-the-gradients-from-the-fc2-network-with-a-batch-of-64-tinyimagenet-inputs-the-quality-of-images-recovered-by-cp-is-significantly-better-than-the-gm-attack-please-see-appendixref-appadditionalresults-for-additional-results'>5<!-- tex4ht:ref: fig:results_tiny_imagenet  --></a> shows qualitative results comparing CPA and GMA for Tiny-ImageNet with a batch size of 64. The
+images recovered by CPA have better quality and higher perceptual similarity with the original images, compared to
+the images recovered by GMA. Table <a href='#lpips-scores-comparing-the-performance-of-cocktail-party-cp-and-gradient-matching-gm-attacks-on-fc2-trained-on-cifar10-and-tinyimagenet-cp-our-proposal-significantly-outperforms-gm-prior-work-across-all-batch-sizes'>I<!-- tex4ht:ref: table:results_cifar_tin  --></a> shows quantitative results (LPIPS scores) comparing CPA and GMA with
+various batch sizes. A lower LPIPS value indicates better perceptual similarity and thus a better attack performance.
+Our result can be interpreted by considering the size of the optimization problem being solved by CPA and GMA.
+</p>
+    <ul class='itemize1'>
+    <li class='itemize'><span class='ptmri7t-'>CPA </span>has an optimization complexity <span class='mathjax-inline'>\(\mathcal {O}(n\times n)\)</span>, as it is optimizing over <span class='mathjax-inline'>\(V^*\)</span>, which is an <span class='mathjax-inline'>\(n\times n\)</span> matrix.
+    </li>
+    <li class='itemize'><span class='ptmri7t-'>GMA </span>has an optimization complexity <span class='mathjax-inline'>\(\mathcal {O}(n\times d)\)</span> as it is optimizing directly in the input space.</li></ul>
+<!-- l. 52 --><p class='indent'>  Here, <span class='mathjax-inline'>\(n\)</span> denotes batch size and <span class='mathjax-inline'>\(d\)</span> denotes the dimensionality of the input (<span class='mathjax-inline'>\(d=3072\)</span> for CIFAR-10 and <span class='mathjax-inline'>\(d=12288\)</span> for Tiny-ImageNet). With this in mind,
+we make the following key observations from our results: </p>
+    <ul class='itemize1'>
+    <li class='itemize'><span class='ptmri7t-'>Comparison with prior work: </span>CPA significantly outperforms GMA across all batches sizes since size of the optimization
+    problem  is  much  smaller  for  CPA  compared  to  GMA.  E.g.  for  n=64  with  Tiny-ImageNet  (d=12288),  the  size  of  the
+    optimization is 4096 for CPA and 786432 for GMA.
+    </li>
+    <li class='itemize'><span class='ptmri7t-'>Sensitivity to batch size: </span>The size of the optimization problem increases with an increase in batch size for both CPA and
+    GMA causing their performance to degrade for larger batch sizes.
+    </li>
+    <li class='itemize'><span class='ptmri7t-'>Sensitivity  to  input  dimensionality:  </span>The  optimization  in  CPA  is  independent  of  the  input  dimensionality  <span class='mathjax-inline'>\(d\)</span>.  Consequently,
+    CPA performs significantly better for datasets with larger inputs (Tiny-ImageNet) compared to GMA, especially for larger
+    batch sizes.
+</li></ul>
+<hr class='figure' /><div class='figure' id='distribution-of-cosine-similarity-cs-values-computed-between-the-private-embeddings-z-and-the-embeddings-recovered-by-cpa-z-most-of-the-cs-values-are-close-to-the-ideal-value-of-1'>
+<div class='centerline'>                                                <img alt='PIC' height='412' src='figs/cs_imagenet-.png' width='412' />                                               </div>
+<a id='x1-50r7'></a>
+<span class='ptmr7t-x-x-80'>Fig. 7.  Distribution  of  cosine  similarity  (CS)  values  computed  between  the  private  embeddings  </span><span class='mathjax-inline'>\(z\)  </span><span class='ptmr7t-x-x-80'>and  the  embeddings  recovered  by  CPA  </span><span class='mathjax-inline'>\(\hat {z}\)</span><span class='ptmr7t-x-x-80'>.  Most  of  the  CS
+values are close to the ideal value of 1.</span></div><hr class='endfigure' />
+<!-- l. 69 --><p class='indent' id='vcresults-for-vgg16'>  
+<a id='x1-51r3'></a>
+  <span class='ptmri7t-'>C.  Results for VGG-16</span>
+<a id='Q1-1-8'></a>
+</p><!-- l. 70 --><p class='indent'>  Next, we present the results from our experiments with the VGG-16 network trained on the ImageNet dataset. Our proposed attack
+uses a 2-step process that combines CPA and FIA (Fig. <a href='#we-attack-cnn-models-by-first-recovering-the-private-embedding-from-the-fc-layer-using-cpa-and-then-using-a-feature-inversion-attack-fia-to-recover-the-input-from-these-embeddings'>4<!-- tex4ht:ref: fig:cpa_fi  --></a>) to perform gradient inversion.
+</p><!-- l. 72 --><p class='indent'>  <span class='ptmb7t-'>Embedding  recovery: </span>Our proposed attack starts by recovering the private embeddings <span class='mathjax-inline'>\(\hat {z}\)</span> from the gradients of the
+FC layer. We evaluate the quality of these recovered embeddings by computing its cosine similarity (CS) with the
+original embedding <span class='mathjax-inline'>\(z\)</span>. Fig. <a href='#distribution-of-cosine-similarity-cs-values-computed-between-the-private-embeddings-z-and-the-embeddings-recovered-by-cpa-z-most-of-the-cs-values-are-close-to-the-ideal-value-of-1'>7<!-- tex4ht:ref: fig:cs  --></a> shows the distribution of the CS values for various batch sizes. Our results show that
+CPA allows near-perfect recovery of embeddings in most cases, with the CS values degrading slightly for larger batch
+sizes.
+</p><!-- l. 74 --><p class='indent'>  <span class='ptmb7t-'>Gradient Inversion: </span>We use the embeddings recovered from CPA to estimate the inputs with a feature inversion attack. Table <a href='#lpips-scores-of-images-recovered-using-gm-prior-work-cpfi-our-proposal-and-cpfigm-prior-work-our-proposal-attacks-with-vgg16-network-trained-on-imagenet'>II<!-- tex4ht:ref: table:results_imagenet  --></a>
+shows the <span class='mathjax-inline'>\(LPIPS\)</span> scores comparing gradient matching attack (prior work), cocktail party + feature inversion attack (our proposal) and
+cocktail party + feature inversion + gradient matching attack (our proposal + prior work). We make the following key
+                                                                                                  
+                                                                                                  
+observations:
+                                                                                                  
+                                                                                                  
+</p><!-- l. 76 --><p class='indent'>  </p><hr class='float' /><div class='float' id='lpips-scores-of-images-recovered-using-gm-prior-work-cpfi-our-proposal-and-cpfigm-prior-work-our-proposal-attacks-with-vgg16-network-trained-on-imagenet'>
+                                                                                                  
+                                                                                                  
+<a id='x1-52r2'></a>
+<span class='ptmr7t-x-x-80'>TABLE II</span><br />
+<span class='mathjax-inline'>\(LPIPS\downarrow \) </span><span class='ptmrc7t-x-x-80'><span class='small-caps'>scores of images recovered using</span> GM (<span class='small-caps'>prior work</span>), CP+FI (<span class='small-caps'>our proposal</span>) <span class='small-caps'>and</span> CP+FI+GM (<span class='small-caps'>prior work</span> + <span class='small-caps'>our proposal</span>) <span class='small-caps'>attacks</span>,</span>
+<span class='ptmrc7t-x-x-80'><span class='small-caps'>with</span> VGG-16 <span class='small-caps'>network trained on</span> I<span class='small-caps'>mage</span>N<span class='small-caps'>et</span>.</span>
+ <!-- tex4ht:inline --><div class='tabular'>  
+<table class='tabular' id='TBL-2'><colgroup id='TBL-2-1g'><col id='TBL-2-1' /><col id='TBL-2-2' /><col id='TBL-2-3' /><col id='TBL-2-4' /><col id='TBL-2-5' /><col id='TBL-2-6' /><col id='TBL-2-7' /></colgroup><tr id='TBL-2-1-' style='vertical-align:baseline;'><td class='td11' id='TBL-2-1-1' style='white-space:normal; text-align:center;'>  <div class='multirow'><!--  rows=0  -->
+<span class='ptmb7t-'>Attack</span></div>      </td><td class='td11' colspan='6' id='TBL-2-1-2' style='white-space:normal; text-align:center;'>                   <div class='multicolumn' style='white-space:normal; text-align:center;'><span class='ptmb7t-'>Batch  Size</span></div>
+</td></tr><tr id='TBL-2-2-' style='vertical-align:baseline;'><td class='td11' id='TBL-2-2-1' style='white-space:normal; text-align:center;'>          </td><td class='td11' colspan='6' id='TBL-2-2-2' style='white-space:normal; text-align:center;'></td></tr><tr id='TBL-2-3-' style='vertical-align:baseline;'><td class='td11' id='TBL-2-3-1' style='white-space:normal; text-align:center;'>          </td><td class='td11' id='TBL-2-3-2' style='white-space:normal; text-align:center;'>  32     </td><td class='td11' id='TBL-2-3-3' style='white-space:normal; text-align:center;'>  64     </td><td class='td11' id='TBL-2-3-4' style='white-space:normal; text-align:center;'>  128    </td><td class='td11' id='TBL-2-3-5' style='white-space:normal; text-align:center;'>  256    </td><td class='td11' id='TBL-2-3-6' style='white-space:normal; text-align:center;'>  512    </td><td class='td11' id='TBL-2-3-7' style='white-space:normal; text-align:center;'> 1024   </td>
+</tr><tr id='TBL-2-4-' style='vertical-align:baseline;'><td class='td11' id='TBL-2-4-1' style='white-space:normal; text-align:center;'>    GM         </td><td class='td11' id='TBL-2-4-2' style='white-space:normal; text-align:center;'> 0.536  </td><td class='td11' id='TBL-2-4-3' style='white-space:normal; text-align:center;'> 0.594  </td><td class='td11' id='TBL-2-4-4' style='white-space:normal; text-align:center;'> 0.609  </td><td class='td11' id='TBL-2-4-5' style='white-space:normal; text-align:center;'> 0.652  </td><td class='td11' id='TBL-2-4-6' style='white-space:normal; text-align:center;'> OOM  </td><td class='td11' id='TBL-2-4-7' style='white-space:normal; text-align:center;'> OOM  </td></tr><tr id='TBL-2-5-' style='vertical-align:baseline;'><td class='td11' id='TBL-2-5-1' style='white-space:normal; text-align:center;'> CP+FI </td> <td class='td11' id='TBL-2-5-2' style='white-space:normal; text-align:center;'> 0.483 </td> <td class='td11' id='TBL-2-5-3' style='white-space:normal; text-align:center;'> 0.493 </td> <td class='td11' id='TBL-2-5-4' style='white-space:normal; text-align:center;'> 0.479 </td> <td class='td11' id='TBL-2-5-5' style='white-space:normal; text-align:center;'> 0.495 </td> <td class='td11' id='TBL-2-5-6' style='white-space:normal; text-align:center;'> 0.507 </td> <td class='td11' id='TBL-2-5-7' style='white-space:normal; text-align:center;'> 0.509</td>
+</tr><tr id='TBL-2-6-' style='vertical-align:baseline;'><td class='td11' id='TBL-2-6-1' style='white-space:normal; text-align:center;'> CP+FI+GM  </td><td class='td11' id='TBL-2-6-2' style='white-space:normal; text-align:center;'> <span class='ptmb7t-'>0.392  </span></td><td class='td11' id='TBL-2-6-3' style='white-space:normal; text-align:center;'> <span class='ptmb7t-'>0.430  </span></td><td class='td11' id='TBL-2-6-4' style='white-space:normal; text-align:center;'> <span class='ptmb7t-'>0.423  </span></td><td class='td11' id='TBL-2-6-5' style='white-space:normal; text-align:center;'> <span class='ptmb7t-'>0.469  </span></td><td class='td11' id='TBL-2-6-6' style='white-space:normal; text-align:center;'> OOM  </td><td class='td11' id='TBL-2-6-7' style='white-space:normal; text-align:center;'> OOM  </td>
+</tr></table>                                                                          </div>
+                                                                                                  
+                                                                                                  
+  </div><hr class='endfloat' />
+    <ul class='itemize1'>
+    <li class='itemize'><span class='ptmri7t-'>Comparison with prior work: </span>CP+FI has better average <span class='mathjax-inline'>\(LPIPS\)</span> score as it can recover more images compared to GM. CP+FI+GM
+    improves the number of images recovered further by combining the befits of our proposal (CP+FI) and prior work (GM).
+    </li>
+    <li class='itemize'><span class='ptmri7t-'>Sensitivity to batch size: </span>The performance of GM degrades significantly with larger batch sizes. In contrast, CP+FI shows
+    a smaller degradation and shows better scalability to larger batch sizes.
+    </li>
+    <li class='itemize'><span class='ptmri7t-'>Memory  Footprint:  </span>The  optimization  for  gradient  matching  is  <span class='mathjax-inline'>\(\mathcal {O}(n\times d)\)</span>.  The  memory  footprint  of  this  optimization  can  exceed
+    the  available  GPU  memory  when  the  input  dimensionality  (<span class='mathjax-inline'>\(d\)</span>)  is  large.  For  ImageNet,  we  found  that  an  8-GPU  machine
+    cannot handle batch sizes in excess of 256 causing out of memory (OOM) errors. In contrast, the optimization for CPA
+    is independent of <span class='mathjax-inline'>\(d\)</span> and can scale to a batch size of 1024.</li></ul>
+<!-- l. 2 --><p class='indent' id='vilimitation-and-defenses'>  
+<a id='x1-53r6'></a>
+<span class='ptmrc7t-'>VI.  L<span class='small-caps'>imitation and</span> D<span class='small-caps'>efenses</span></span>
+<a id='Q1-1-9'></a>
+</p><!-- l. 3 --><p class='indent'>  <span class='ptmb7t-'>Batch Size: </span>ICA requires the number of aggregate gradients from neurons (mixed signals) to be greater than or equal to the number
+of inputs (source signals). Thus choosing a very large batch size that exceeds the number of neurons in the FC layer can prevent our
+attack.
+</p><!-- l. 5 --><p class='indent'>  <span class='ptmb7t-'>Embedding size: </span>The efficacy of feature inversion attack depends on the size of the embedding. For a CNN that produces a smaller
+sized embedding, FIA might be harder to carry out. However, this limitation can be overcome if the attacker knows the input data
+distribution.
+</p><!-- l. 7 --><p class='indent'>  <span class='ptmb7t-'>Differential Privacy (DP) Defense: </span>Table <a href='#lpips-scores-of-recovered-images-from-cp-and-gm-attacks-under-varying-magnitudes-of-dp-noise'>III<!-- tex4ht:ref: table:dp  --></a> shows the <span class='mathjax-inline'>\(LPIPS\)</span> scores from CP and GM evaluated under DP noise <span class='cite'> [<a href='#Xdwork2014algorithmic'>5</a>, <a href='#Xdpsgd'>1</a>]</span>. We use the
+FC2 model with Tiny-ImageNet dataset and a batch size of 8 for these experiments. We scale the gradients to have unit
+norm and perturb the gradients with different amounts of Gaussian noise. We also show the <span class='mathjax-inline'>\(\epsilon \)</span> values for <span class='mathjax-inline'>\((\epsilon , \delta )\)</span> DP with <span class='mathjax-inline'>\(\delta =0.00001\)</span>
+corresponding to different amounts of noise. Our evaluations show that DP noise provides an effective defense against our
+attack.
+                                                                                                  
+                                                                                                  
+</p><!-- l. 8 --><p class='indent'>  </p><hr class='float' /><div class='float' id='lpips-scores-of-recovered-images-from-cp-and-gm-attacks-under-varying-magnitudes-of-dp-noise'>
+                                                                                                  
+                                                                                                  
+<a id='x1-54r3'></a>
+<span class='ptmr7t-x-x-80'>TABLE III</span><br />
+<span class='mathjax-inline'>\(LPIPS\downarrow \) </span><span class='ptmrc7t-x-x-80'><span class='small-caps'>scores of recovered images from</span> CP <span class='small-caps'>and</span> GM <span class='small-caps'>attacks under varying magnitudes of</span> DP <span class='small-caps'>noise</span>.</span>
+ <!-- tex4ht:inline --><div class='tabular'>  
+<table class='tabular' id='TBL-3'><colgroup id='TBL-3-1g'><col id='TBL-3-1' /><col id='TBL-3-2' /><col id='TBL-3-3' /><col id='TBL-3-4' /><col id='TBL-3-5' /></colgroup><tr id='TBL-3-1-' style='vertical-align:baseline;'><td class='td11' id='TBL-3-1-1' style='white-space:normal; text-align:center;'>  <span class='mathjax-inline'>\(\sigma \)</span>  </td><td class='td11' id='TBL-3-1-2' style='white-space:normal; text-align:center;'>   0       </td><td class='td11' id='TBL-3-1-3' style='white-space:normal; text-align:center;'> 0.0001   </td><td class='td11' id='TBL-3-1-4' style='white-space:normal; text-align:center;'> 0.001   </td><td class='td11' id='TBL-3-1-5' style='white-space:normal; text-align:center;'> 0.01   </td></tr><tr id='TBL-3-2-' style='vertical-align:baseline;'><td class='td11' id='TBL-3-2-1' style='white-space:normal; text-align:center;'> <span class='mathjax-inline'>\(\epsilon \)</span> </td> <td class='td11' id='TBL-3-2-2' style='white-space:normal; text-align:center;'> <span class='mathjax-inline'>\(\infty \)</span> </td> <td class='td11' id='TBL-3-2-3' style='white-space:normal; text-align:center;'> 6056.00 </td> <td class='td11' id='TBL-3-2-4' style='white-space:normal; text-align:center;'> 606.60 </td> <td class='td11' id='TBL-3-2-5' style='white-space:normal; text-align:center;'> 60.56</td>
+
+</tr><tr id='TBL-3-3-' style='vertical-align:baseline;'><td class='td11' id='TBL-3-3-1' style='white-space:normal; text-align:center;'> GM  </td><td class='td11' id='TBL-3-3-2' style='white-space:normal; text-align:center;'> 0.182   </td><td class='td11' id='TBL-3-3-3' style='white-space:normal; text-align:center;'>  0.426    </td><td class='td11' id='TBL-3-3-4' style='white-space:normal; text-align:center;'> 0.728   </td><td class='td11' id='TBL-3-3-5' style='white-space:normal; text-align:center;'> 0.701  </td></tr><tr id='TBL-3-4-' style='vertical-align:baseline;'><td class='td11' id='TBL-3-4-1' style='white-space:normal; text-align:center;'> CP </td> <td class='td11' id='TBL-3-4-2' style='white-space:normal; text-align:center;'> 0.0082 </td> <td class='td11' id='TBL-3-4-3' style='white-space:normal; text-align:center;'> 0.474 </td> <td class='td11' id='TBL-3-4-4' style='white-space:normal; text-align:center;'> 0.721 </td> <td class='td11' id='TBL-3-4-5' style='white-space:normal; text-align:center;'> 0.723</td>
+</tr></table>                                                                               </div>
+                                                                                                  
+                                                                                                  
+  </div><hr class='endfloat' />
+<!-- l. 1 --><p class='indent' id='appendix'>  
+<a id='x1-55r7'></a>
+<span class='ptmrc7t-'>VII.  E<span class='small-caps'>xtensions to</span> CPA</span>
+<a id='Q1-1-10'></a>
+</p><!-- l. 2 --><p class='indent'>  Our evaluations in this paper assume that the the network does not use batchnorm layers and that the attacker does not have access to
+the input data distribution. When this information is available, it can be combined with our attack to further improve performance.
+Additionally, the private embeddings leaked from CPA can also be used to infer additional attributes about the input <span class='cite'> [<a href='#Xyeom2018privacy'>21</a>]</span>. Lastly, our
+work can also be extended to language models and recommendation systems where it is common for the input to be fed directly to a
+FC layer. We leave this as part of our future work.
+</p><!-- l. 2 --><p class='indent' id='appendix'>  
+<a id='x1-56r8'></a>
+<span class='ptmrc7t-'>VIII.  C<span class='small-caps'>onclusion</span></span>
+<a id='Q1-1-10'></a>
+</p><!-- l. 3 --><p class='indent'>  We propose <span class='ptmri7t-'>Cocktail Party Attack (CPA) </span>– a gradient inversion attack that can recovers private inputs from aggregate gradients in FL.
+Our work is based on the key insight that gradients from an FC layer are linear combinations of its inputs. CPA uses
+this insight to frame gradient inversion for an FC layer as a blind source separation problem and uses independent
+component analysis to recover the inputs. CPA can be used directly on FC models to recover the inputs. It can also by
+extended to CNN models by first recovering the embeddings from an FC layer and then using a feature inversion
+attack to recover the inputs from the embeddings. Our evaluations on several image classification tasks show that CPA
+can perform high-quality gradient inversion, scales to ImageNet-sized inputs, and works with a batch size as large as
+1024. CPA is orthogonal to prior works that use gradient matching and can be combined with gradient matching based
+approaches to further improve gradient inversion. Our work demonstrates that that aggregation alone is not sufficient to
+ensure privacy and methods like differential privacy are truly necessary to provide meaningful privacy guarantees in
+FL.
+</p><!-- l. 1 --><p class='indent' id='appendix'>  
+  <span class='ptmrc7t-'>R<span class='small-caps'>eferences</span></span>
+<a id='Q1-1-10'></a>
+</p><!-- l. 1 --><p class='indent'>
+   </p><div class='thebibliography'>
+   <p class='bibitem'><span class='biblabel'>
+ <span class='ptmr7t-x-x-80'>[1] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xdpsgd'></a><span class='ptmr7t-x-x-80'>Martin Abadi, Andy Chu, Ian Goodfellow, H Brendan McMahan, Ilya Mironov, Kunal Talwar, and Li Zhang. Deep learning with differential privacy.
+   In </span><span class='ptmri7t-x-x-80'>Proceedings of the 2016 ACM SIGSAC conference on computer and communications security</span><span class='ptmr7t-x-x-80'>, pages 308–318, 2016.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+ <span class='ptmr7t-x-x-80'>[2] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xcurious'></a><span class='ptmr7t-x-x-80'>Franziska  Boenisch,  Adam  Dziedzic,  Roei  Schuster,  Ali Shahin  Shamsabadi,  Ilia  Shumailov,  and  Nicolas  Papernot.   When  the  curious  abandon
+   honesty: Federated learning is not private.  </span><span class='ptmri7t-x-x-80'>arXiv preprint arXiv:2112.02918</span><span class='ptmr7t-x-x-80'>, 2021.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+ <span class='ptmr7t-x-x-80'>[3] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xsecure_aggregation'></a><span class='ptmr7t-x-x-80'>K. A. Bonawitz, Vladimir Ivanov, Ben Kreuter, Antonio Marcedone, H. Brendan McMahan, Sarvar Patel, Daniel Ramage, Aaron Segal, and Karn
+   Seth.  Practical secure aggregation for federated learning on user-held data.  In </span><span class='ptmri7t-x-x-80'>NIPS Workshop on Private Multi-Party Machine Learning</span><span class='ptmr7t-x-x-80'>, 2016.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+ <span class='ptmr7t-x-x-80'>[4] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xdeng2009imagenet'></a><span class='ptmr7t-x-x-80'>Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li, and Li Fei-Fei. Imagenet: A large-scale hierarchical image database. In </span><span class='ptmri7t-x-x-80'>2009 IEEE conference
+   on computer vision and pattern recognition</span><span class='ptmr7t-x-x-80'>, pages 248–255. Ieee, 2009.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+ <span class='ptmr7t-x-x-80'>[5] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xdwork2014algorithmic'></a><span class='ptmr7t-x-x-80'>Cynthia Dwork, Aaron Roth, et al.  The algorithmic foundations of differential privacy.  </span><span class='ptmri7t-x-x-80'>Foundations and Trends® in Theoretical Computer Science</span><span class='ptmr7t-x-x-80'>,
+   9(3–4):211–407, 2014.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+ <span class='ptmr7t-x-x-80'>[6] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xrob'></a><span class='ptmr7t-x-x-80'>Liam Fowl, Jonas Geiping, Wojtek Czaja, Micah Goldblum, and Tom Goldstein. Robbing the fed: Directly obtaining private data in federated learning
+   with modified models.  </span><span class='ptmri7t-x-x-80'>arXiv preprint arXiv:2110.13057</span><span class='ptmr7t-x-x-80'>, 2021.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+ <span class='ptmr7t-x-x-80'>[7] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xgeiping'></a><span class='ptmr7t-x-x-80'>Jonas Geiping, Hartmut Bauermeister, Hannah Dröge, and Michael Moeller.  Inverting gradients-how easy is it to break privacy in federated learning?
+   </span><span class='ptmri7t-x-x-80'>Advances in Neural Information Processing Systems</span><span class='ptmr7t-x-x-80'>, 33:16937–16947, 2020.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+ <span class='ptmr7t-x-x-80'>[8] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xgradvit'></a><span class='ptmr7t-x-x-80'>Ali  Hatamizadeh,  Hongxu  Yin,  Holger R  Roth,  Wenqi  Li,  Jan  Kautz,  Daguang  Xu,  and  Pavlo  Molchanov.   Gradvit:  Gradient  inversion  of  vision
+   transformers.  In </span><span class='ptmri7t-x-x-80'>Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition</span><span class='ptmr7t-x-x-80'>, pages 10021–10030, 2022.</span>
+   </p>
+                                                                                                  
+                                                                                                  
+   <p class='bibitem'><span class='biblabel'>
+ <span class='ptmr7t-x-x-80'>[9] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xniid_quagmire'></a><span class='ptmr7t-x-x-80'>Kevin Hsieh, Amar Phanishayee, Onur Mutlu, and Phillip B. Gibbons.  The non-iid data quagmire of decentralized machine learning.  In </span><span class='ptmri7t-x-x-80'>Proceedings
+   of the 37th International Conference on Machine Learning, ICML 2020, 13-18 July 2020, Virtual Event</span><span class='ptmr7t-x-x-80'>, volume 119 of </span><span class='ptmri7t-x-x-80'>Proceedings of Machine Learning
+   Research</span><span class='ptmr7t-x-x-80'>, pages 4387–4398. PMLR, 2020.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[10] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xhyvarinen2000independent'></a><span class='ptmr7t-x-x-80'>Aapo Hyvärinen and Erkki Oja.  Independent component analysis: algorithms and applications.  </span><span class='ptmri7t-x-x-80'>Neural networks</span><span class='ptmr7t-x-x-80'>, 13(4-5):411–430, 2000.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[11] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xgip1'></a><span class='ptmr7t-x-x-80'>Jinwoo  Jeon,  Kangwook  Lee,  Sewoong  Oh,  Jungseul  Ok,  et al.  Gradient  inversion  with  generative  image  prior.  </span><span class='ptmri7t-x-x-80'>Advances  in  Neural  Information
+   Processing Systems</span><span class='ptmr7t-x-x-80'>, 34:29898–29908, 2021.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[12] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xadam'></a><span class='ptmr7t-x-x-80'>Diederik P Kingma and Jimmy Ba.  Adam: A method for stochastic optimization.  </span><span class='ptmri7t-x-x-80'>arXiv preprint arXiv:1412.6980</span><span class='ptmr7t-x-x-80'>, 2014.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[13] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xcifar10'></a><span class='ptmr7t-x-x-80'>Alex Krizhevsky, Geoffrey Hinton, et al.  Learning multiple layers of features from tiny images.  2009.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[14] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xle2015tiny'></a><span class='ptmr7t-x-x-80'>Ya Le and Xuan Yang.  Tiny imagenet visual recognition challenge.  </span><span class='ptmri7t-x-x-80'>CS 231N</span><span class='ptmr7t-x-x-80'>, 7(7):3, 2015.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[15] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xfl_challenges'></a><span class='ptmr7t-x-x-80'>Tian  Li,  Anit Kumar  Sahu,  Ameet  Talwalkar,  and  Virginia  Smith.   Federated  learning:  Challenges,  methods,  and  future  directions.   </span><span class='ptmri7t-x-x-80'>IEEE  Signal
+   Process. Mag.</span><span class='ptmr7t-x-x-80'>, 37(3):50–60, 2020.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[16] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xmcmahan2017communication'></a><span class='ptmr7t-x-x-80'>Brendan McMahan, Eider Moore, Daniel Ramage, Seth Hampson, and Blaise Aguera y Arcas.  Communication-efficient learning of deep networks
+   from decentralized data.  In </span><span class='ptmri7t-x-x-80'>Artificial intelligence and statistics</span><span class='ptmr7t-x-x-80'>, pages 1273–1282. PMLR, 2017.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[17] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xnasr2019comprehensive'></a><span class='ptmr7t-x-x-80'>Milad Nasr, Reza Shokri, and Amir Houmansadr.  Comprehensive privacy analysis of deep learning: Passive and active white-box inference attacks
+   against centralized and federated learning.  In </span><span class='ptmri7t-x-x-80'>2019 IEEE symposium on security and privacy (SP)</span><span class='ptmr7t-x-x-80'>, pages 739–753. IEEE, 2019.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[18] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xtv'></a><span class='ptmr7t-x-x-80'>Leonid I  Rudin,  Stanley  Osher,  and  Emad  Fatemi.   Nonlinear  total  variation  based  noise  removal  algorithms.   </span><span class='ptmri7t-x-x-80'>Physica  D:  nonlinear  phenomena</span><span class='ptmr7t-x-x-80'>,
+   60(1-4):259–268, 1992.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[19] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xsimonyan2014very'></a><span class='ptmr7t-x-x-80'>Karen Simonyan and Andrew Zisserman. Very deep convolutional networks for large-scale image recognition. </span><span class='ptmri7t-x-x-80'>arXiv preprint arXiv:1409.1556</span><span class='ptmr7t-x-x-80'>, 2014.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[20] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xwen2022fishing'></a><span class='ptmr7t-x-x-80'>Yuxin  Wen,  Jonas  Geiping,  Liam  Fowl,  Micah  Goldblum,  and  Tom  Goldstein.  Fishing  for  user  data  in  large-batch  federated  learning  via  gradient
+   magnification.  </span><span class='ptmri7t-x-x-80'>arXiv preprint arXiv:2202.00580</span><span class='ptmr7t-x-x-80'>, 2022.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[21] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xyeom2018privacy'></a><span class='ptmr7t-x-x-80'>Samuel  Yeom,  Irene  Giacomelli,  Matt  Fredrikson,  and  Somesh  Jha.  Privacy  risk  in  machine  learning:  Analyzing  the  connection  to  overfitting.  In
+   </span><span class='ptmri7t-x-x-80'>2018 IEEE 31st computer security foundations symposium (CSF)</span><span class='ptmr7t-x-x-80'>, pages 268–282. IEEE, 2018.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[22] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xyin2021see'></a><span class='ptmr7t-x-x-80'>Hongxu  Yin,  Arun  Mallya,  Arash  Vahdat,  Jose M  Alvarez,  Jan  Kautz,  and  Pavlo  Molchanov.   See  through  gradients:  Image  batch  recovery  via
+   gradinversion.  In </span><span class='ptmri7t-x-x-80'>Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition</span><span class='ptmr7t-x-x-80'>, pages 16337–16346, 2021.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[23] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xdreaming'></a><span class='ptmr7t-x-x-80'>Hongxu Yin, Pavlo Molchanov, Jose M Alvarez, Zhizhong Li, Arun Mallya, Derek Hoiem, Niraj K Jha, and Jan Kautz. Dreaming to distill: Data-free
+   knowledge  transfer  via  deepinversion.   In  </span><span class='ptmri7t-x-x-80'>Proceedings  of  the  IEEE/CVF  Conference  on  Computer  Vision  and  Pattern  Recognition</span><span class='ptmr7t-x-x-80'>,  pages  8715–8724,
+   2020.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[24] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xlpips'></a><span class='ptmr7t-x-x-80'>Richard  Zhang,  Phillip  Isola,  Alexei A  Efros,  Eli  Shechtman,  and  Oliver  Wang.   The  unreasonable  effectiveness  of  deep  features  as  a  perceptual
+   metric.  In </span><span class='ptmri7t-x-x-80'>Proceedings of the IEEE conference on computer vision and pattern recognition</span><span class='ptmr7t-x-x-80'>, pages 586–595, 2018.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[25] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xidlg'></a><span class='ptmr7t-x-x-80'>Bo Zhao, Konda Reddy Mopuri, and Hakan Bilen.  idlg: Improved deep leakage from gradients.  </span><span class='ptmri7t-x-x-80'>arXiv preprint arXiv:2001.02610</span><span class='ptmr7t-x-x-80'>, 2020.</span>
+   </p>
+   <p class='bibitem'><span class='biblabel'>
+<span class='ptmr7t-x-x-80'>[26] </span><span class='bibsp'><span class='ptmr7t-x-x-80'>   </span></span></span><a id='Xdlg'></a><span class='ptmr7t-x-x-80'>Ligeng Zhu, Zhijian Liu, and Song Han.  Deep leakage from gradients.  </span><span class='ptmri7t-x-x-80'>Advances in neural information processing systems</span><span class='ptmr7t-x-x-80'>, 32, 2019.</span>
+</p>
+   </div>
+                                                                                                  
+                                                                                                  
+<p><a id='x1-83r1'></a>
+<!-- l. 3 --></p><p class='indent' id='appendix'>  
+  <span class='ptmrc7t-'>A<span class='small-caps'>ppendix</span></span>
+<a id='Q1-1-10'></a>
+</p><!-- l. 6 --><p class='indent'>  The optimization function used by CPA (Eqn. <a href='#x1-84r14'>14<!-- tex4ht:ref: eq:ica2  --></a>) consists of three terms that correspond to: 1. negentropy (NE) 2. total variation
+(TV) and 3. mutual independence (MI) objectives. </p><div class='mathjax-env mathjax-align'>\begin{align}\label {eq:ica2} \begin {split} \hat {V} = \argmax _{V^*} \underset {i}{\mathbb E} \Big [J(v^*_iG) - \lambda _{TV} \mathcal {R}_{TV}(v^*_iG)\\ - \lambda _{MI}\underset {i\neq j}{\mathbb E} |exp(T\cdot |CS(v^*_i, v^*_j)|)|\Big ] \end {split} \end{align}</div>
+<p><a id='x1-84r14'></a>
+<!-- l. 13 --></p><p class='indent'>  To understand the importance of these three terms, we perform an ablation study. We use the FC2 model trained on
+TinyImagenet with a batch size 32 for our study and measure LPIPS by carrying out the attack by excluding different
+loss terms to understand their importance. We perform hyperparameter sweeps in each case and report the best (i.e.
+lowest) value of LPIPS in Table <a href='#ablation-study-to-understand-the-relative-importance-of-different-terms-in-the-optimization-function'>IV<!-- tex4ht:ref: table:ablation  --></a>. A higher value of LPIPS indicates a higher degradation in the quality of the
+image recovered, which implies a high level of importance on the term being removed. Our results indicate that the
+MI term is the most important. We find that without the MI term the optimization recovers the same image multiple
+times. TV is the second most important term, indicating that even a simple image prior is quite powerful. The NE term
+which enforces non-Guassianity has the lowest marginal benefit as it only provides a very weak prior on the source
+signal.
+                                                                                                  
+                                                                                                  
+</p><!-- l. 14 --><p class='indent'>  </p><hr class='float' /><div class='float' id='ablation-study-to-understand-the-relative-importance-of-different-terms-in-the-optimization-function'>
+                                                                                                  
+                                                                                                  
+<a id='x1-85r4'></a>
+<span class='ptmr7t-x-x-80'>TABLE IV</span><br />
+<span class='ptmrc7t-x-x-80'>A<span class='small-caps'>blation study to understand the relative importance of different terms in the optimization function</span>.</span>
+<div class='tabular'>
+ <table class='tabular' id='TBL-4'><colgroup id='TBL-4-1g'><col id='TBL-4-1' /><col id='TBL-4-2' /><col id='TBL-4-3' /><col id='TBL-4-4' /><col id='TBL-4-5' /></colgroup><tr id='TBL-4-1-' style='vertical-align:baseline;'><td class='td11' id='TBL-4-1-1' style='white-space:normal; text-align:center;'>      </td><td class='td11' id='TBL-4-1-2' style='white-space:normal; text-align:center;'> NE+TV+MI  </td><td class='td11' id='TBL-4-1-3' style='white-space:normal; text-align:center;'> -NE    </td><td class='td11' id='TBL-4-1-4' style='white-space:normal; text-align:center;'> -TV    </td><td class='td11' id='TBL-4-1-5' style='white-space:normal; text-align:center;'>  -MI    </td>
+</tr><tr id='TBL-4-2-' style='vertical-align:baseline;'><td class='td11' id='TBL-4-2-1' style='white-space:normal; text-align:center;'> LPIPS <span class='mathjax-inline'>\(\downarrow \)</span>  </td><td class='td11' id='TBL-4-2-2' style='white-space:normal; text-align:center;'>   0.081        </td><td class='td11' id='TBL-4-2-3' style='white-space:normal; text-align:center;'> 0.092  </td><td class='td11' id='TBL-4-2-4' style='white-space:normal; text-align:center;'> 0.368  </td><td class='td11' id='TBL-4-2-5' style='white-space:normal; text-align:center;'> 0.546  </td>
+</tr></table>                                                                                        </div> 
+                                                                                                  
+                                                                                                  
+  </div><hr class='endfloat' />
+<!-- l. 31 --><p class='indent'>  Fig. <a href='#comparison-of-a-random-subset-of-images-recovered-by-various-gradient-inversion-attacks-carried-out-using-the-gradients-from-fc2-with-a-batch-of-64-tinyimagenet-images-images-are-not-cherrypicked'>8<!-- tex4ht:ref: fig:tin1  --></a>, Fig. <a href='#comparison-of-a-random-subset-of-images-recovered-by-various-gradient-inversion-attacks-carried-out-using-the-gradients-from-fc2-with-a-batch-of-64-tinyimagenet-images-images-are-not-cherrypicked1'>9<!-- tex4ht:ref: fig:tin2  --></a>, Fig. <a href='#comparison-of-a-random-subset-of-images-recovered-by-various-gradient-inversion-attacks-carried-out-using-the-gradients-from-vgg16-with-a-batch-of-256-imagenet-images-images-are-not-cherrypicked'>10<!-- tex4ht:ref: fig:im1  --></a> and Fig. <a href='#comparison-of-a-random-subset-of-images-recovered-by-various-gradient-inversion-attacks-carried-out-using-the-gradients-from-vgg16-with-a-batch-of-256-imagenet-images-images-are-not-cherrypicked1'>11<!-- tex4ht:ref: fig:im2  --></a> show additional qualitative results comparing the recovered images from gradient inversion
+attacks on Tiny-ImageNet and ImageNet.
+                                                                                                  
+                                                                                                  
+</p><!-- l. 43 --><p class='indent'>  </p><hr class='float' /><div class='float' id='comparison-of-a-random-subset-of-images-recovered-by-various-gradient-inversion-attacks-carried-out-using-the-gradients-from-fc2-with-a-batch-of-64-tinyimagenet-images-images-are-not-cherrypicked'>
+                                                                                                  
+                                                                                                  
+<div class='centerline'>                                                <img alt='PIC' height='516' src='figs/tim1-.png' width='516' />                                               </div>
+<a id='x1-86r8'></a>
+<span class='ptmr7t-x-x-80'>Fig. 8.  Comparison of a random subset of images recovered by various gradient inversion attacks carried out using the gradients from FC2 with a batch of
+64 Tiny-ImageNet images. Images are not cherry-picked.</span>
+                                                                                                  
+                                                                                                  
+  </div><hr class='endfloat' />
+                                                                                                  
+                                                                                                  
+<!-- l. 50 --><p class='indent'>  </p><hr class='float' /><div class='float' id='comparison-of-a-random-subset-of-images-recovered-by-various-gradient-inversion-attacks-carried-out-using-the-gradients-from-fc2-with-a-batch-of-64-tinyimagenet-images-images-are-not-cherrypicked1'>
+                                                                                                  
+                                                                                                  
+<div class='centerline'>                                                 <img alt='PIC' height='516' src='figs/tim2-.png' width='516' />                                               </div>
+<a id='x1-87r9'></a>
+<span class='ptmr7t-x-x-80'>Fig. 9.  Comparison of a random subset of images recovered by various gradient inversion attacks carried out using the gradients from FC2 with a batch of
+64 Tiny-ImageNet images. Images are not cherry-picked.</span>
+                                                                                                  
+                                                                                                  
+  </div><hr class='endfloat' />
+                                                                                                  
+                                                                                                  
+<!-- l. 57 --><p class='indent'>  </p><hr class='float' /><div class='float' id='comparison-of-a-random-subset-of-images-recovered-by-various-gradient-inversion-attacks-carried-out-using-the-gradients-from-vgg16-with-a-batch-of-256-imagenet-images-images-are-not-cherrypicked'>
+                                                                                                  
+                                                                                                  
+<div class='centerline'>                                                 <img alt='PIC' height='516' src='figs/im1-.png' width='516' />                                               </div>
+<div class='centerline'>                                                <img alt='PIC' height='516' src='figs/im2-.png' width='516' />                                               </div>
+<a id='x1-88r10'></a>
+<span class='ptmr7t-x-x-80'>Fig. 10.  Comparison  of  a  random  subset  of  images  recovered  by  various  gradient  inversion  attacks  carried  out  using  the  gradients  from  VGG-16  with  a
+batch of 256 ImageNet images. Images are not cherry-picked.</span>
+                                                                                                  
+                                                                                                  
+  </div><hr class='endfloat' />
+                                                                                                  
+                                                                                                  
+<!-- l. 66 --><p class='indent'>  </p><hr class='float' /><div class='float' id='comparison-of-a-random-subset-of-images-recovered-by-various-gradient-inversion-attacks-carried-out-using-the-gradients-from-vgg16-with-a-batch-of-256-imagenet-images-images-are-not-cherrypicked1'>
+                                                                                                  
+                                                                                                  
+<div class='centerline'>                                                 <img alt='PIC' height='516' src='figs/im3-.png' width='516' />                                               </div>
+<div class='centerline'>                                                <img alt='PIC' height='516' src='figs/im4-.png' width='516' />                                               </div>
+<a id='x1-89r11'></a>
+<span class='ptmr7t-x-x-80'>Fig. 11.  Comparison  of  a  random  subset  of  images  recovered  by  various  gradient  inversion  attacks  carried  out  using  the  gradients  from  VGG-16  with  a
+batch of 256 ImageNet images. Images are not cherry-picked.</span>
+                                                                                                  
+                                                                                                  
+  </div><hr class='endfloat' />
+  <div class='footnotes'>     <aside class='footnotetext' role='doc-footnote'>
+<!-- l. 30 --><p class='noindent'><a id='x1-10x2'></a><span class='footnote-mark'><a href='#fn2x0-bk' id='fn2x0'><sup class='textsuperscript'>2</sup></a></span><span class='ptmr7t-x-x-80'>All emojis in this paper are from https://openmoji.org/ and licensed CC BY-SA 4.0.</span></p></aside> 
+ <aside class='footnotetext' role='doc-footnote'>
+<!-- l. 49 --><p class='noindent'><a id='x1-26x3'></a><span class='footnote-mark'><a href='#fn3x0-bk' id='fn3x0'><sup class='textsuperscript'>3</sup></a></span><span class='ptmr7t-x-x-80'>We whiten and center the gradients before using it in our optimization.</span></p></aside> 
+ <aside class='footnotetext' role='doc-footnote'>
+<!-- l. 49 --><p class='noindent'><a id='x1-28x4'></a><span class='footnote-mark'><a href='#fn4x0-bk' id='fn4x0'><sup class='textsuperscript'>4</sup></a></span><span class='ptmr7t-x-x-80'>To understand the relative importance of different terms in the optimization, we refer the reader to the ablation study in Appendix </span><a href='#x1-83r1'><span class='ptmr7t-x-x-80'>A</span><!-- tex4ht:ref: app:ablation  --></a><span class='ptmr7t-x-x-80'>.</span></p></aside> 
+ <aside class='footnotetext' role='doc-footnote'>
+<!-- l. 18 --><p class='noindent'><a id='x1-45x5'></a><span class='footnote-mark'><a href='#fn5x0-bk' id='fn5x0'><sup class='textsuperscript'>5</sup></a></span><span class='ptmr7t-x-x-80'>Except a single batch of inputs used to tune the hyperparameters</span></p></aside> 
+ <aside class='footnotetext' role='doc-footnote'>
+<!-- l. 18 --><p class='noindent'><a id='x1-47x6'></a><span class='footnote-mark'><a href='#fn6x0-bk' id='fn6x0'><sup class='textsuperscript'>6</sup></a></span><span class='ptmr7t-x-x-80'>Attacks that use generative models </span><span class='cite'><span class='ptmr7t-x-x-80'> [</span><a href='#Xgip1'><span class='ptmr7t-x-x-80'>11</span></a><span class='ptmr7t-x-x-80'>]</span></span> <span class='ptmr7t-x-x-80'>assume access to in-distribution data and cannot be used under our threat model</span></p></aside> 
+                                                  </div>
+ 
+</body> 
+</html>

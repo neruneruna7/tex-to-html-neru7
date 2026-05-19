@@ -105,6 +105,44 @@ Output:
     );
 }
 
+fn print_latex_error_context(work_dir: &Path) -> Result<()> {
+    let mut logs = Vec::new();
+
+    for entry in
+        fs::read_dir(work_dir).with_context(|| format!("failed to read {}", work_dir.display()))?
+    {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.extension() == Some(OsStr::new("log")) {
+            logs.push(path);
+        }
+    }
+
+    for log_path in logs {
+        let content = fs::read_to_string(&log_path)
+            .with_context(|| format!("failed to read {}", log_path.display()))?;
+
+        let lines: Vec<&str> = content.lines().collect();
+
+        for (i, line) in lines.iter().enumerate() {
+            if line.contains("Undefined control sequence") {
+                eprintln!();
+                eprintln!("==== LaTeX error context from {} ====", log_path.display());
+
+                let start = i.saturating_sub(3);
+                let end = usize::min(i + 8, lines.len());
+
+                for j in start..end {
+                    eprintln!("{:>6}: {}", j + 1, lines[j]);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn ensure_tar_gz(path: &Path) -> Result<()> {
     let file_name = path
         .file_name()
@@ -205,7 +243,34 @@ fn find_main_tex_file(work_dir: &Path) -> Result<PathBuf> {
 
 fn write_make4ht_config(path: &Path) -> Result<()> {
     let config = r#"\Preamble{xhtml}
+
 \Configure{CutAt}{}
+
+% Common paper macros that may be undefined under htlatex.
+\providecommand{\etal}{et al.}
+\providecommand{\eg}{e.g.}
+\providecommand{\ie}{i.e.}
+\providecommand{\cf}{cf.}
+
+% Cross-reference fallbacks.
+\providecommand{\cref}[1]{\ref{#1}}
+\providecommand{\Cref}[1]{\ref{#1}}
+\providecommand{\autoref}[1]{\ref{#1}}
+
+% Annotation commands often used in drafts.
+\providecommand{\todo}[1]{}
+\providecommand{\TODO}[1]{}
+\providecommand{\note}[1]{}
+\providecommand{\comment}[1]{}
+
+% IEEE-related fallbacks.
+\providecommand{\IEEEpubid}[1]{}
+\providecommand{\IEEEpubidadjcol}{}
+\providecommand{\IEEEpeerreviewmaketitle}{}
+\providecommand{\IEEEauthorblockN}[1]{#1}
+\providecommand{\IEEEauthorblockA}[1]{#1}
+\providecommand{\IEEEoverridecommandlockouts}{}
+
 \Css{
 :root {
   color-scheme: light;
@@ -215,6 +280,7 @@ html, body {
   color: black;
 }
 }
+
 \begin{document}
 \EndPreamble
 "#;
@@ -238,12 +304,12 @@ fn run_make4ht(work_dir: &Path, tex_file_rel: &Path, output_dir_abs: &Path) -> R
         .context("failed to execute make4ht; is MacTeX/TeX Live installed and PATH configured?")?;
 
     if !status.success() {
+        print_latex_error_context(work_dir)?;
         bail!("make4ht failed with status: {status}");
     }
 
     Ok(())
 }
-
 fn normalize_single_html(output_dir: &Path) -> Result<()> {
     let mut html_files = Vec::new();
 
