@@ -197,10 +197,21 @@ fn extract_tar_gz(archive_path: &Path, extract_dir: &Path) -> Result<()> {
     Ok(())
 }
 fn find_main_tex_file(work_dir: &Path) -> Result<PathBuf> {
-    let conventional_main = work_dir.join("main.tex");
+    let conventional_names = [
+        "main.tex",
+        "0-main.tex",
+        "paper.tex",
+        "article.tex",
+        "manuscript.tex",
+        "ms.tex",
+    ];
 
-    if conventional_main.is_file() {
-        return Ok(PathBuf::from("main.tex"));
+    for name in conventional_names {
+        let candidate = work_dir.join(name);
+
+        if candidate.is_file() {
+            return Ok(PathBuf::from(name));
+        }
     }
 
     let mut tex_files = Vec::new();
@@ -231,7 +242,16 @@ fn find_main_tex_file(work_dir: &Path) -> Result<PathBuf> {
         0 => bail!("no .tex file found under {}", work_dir.display()),
         1 => Ok(tex_files.remove(0)),
         _ => {
-            eprintln!("Multiple .tex files found and no top-level main.tex was selected:");
+            eprintln!("Multiple .tex files found and no conventional main file was selected:");
+            eprintln!("Looked for these top-level names:");
+
+            for name in conventional_names {
+                eprintln!("  {name}");
+            }
+
+            eprintln!();
+            eprintln!("Found .tex files:");
+
             for path in &tex_files {
                 eprintln!("  {}", path.display());
             }
